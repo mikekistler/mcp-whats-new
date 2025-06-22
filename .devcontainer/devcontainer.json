@@ -12,7 +12,7 @@
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// Expose the ports for the MCP Inspector
-	,"forwardPorts": [6277]
+	,"forwardPorts": [3001,6277]
 	// "portsAttributes": {
 	//		"5001": {
 	//			"protocol": "https"

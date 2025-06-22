@@ -40,5 +40,19 @@ The output schema can also inform the LLM about the expected structure of the to
 [UseStructuredContent]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolAttribute.html#ModelContextProtocol_Server_McpServerToolAttribute_UseStructuredContent
 
 ## Elicitation:: Interactive User Engagement
+
 ## Resource links in tool call results
-## Negotiated Protocol Version
+
+## Negotiated Protocol Version Header
+
+<!-- SDK PR: https://github.com/modelcontextprotocol/csharp-sdk/pull/500 -->
+
+MCP has supported [protocol version negotiation] since the 2024-11-05 version of the MCP Specification.
+Version negotiation is done through the "initialize" message and response which is always the first message sent in a session.
+
+[protocol version negotiation]: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle#version-negotiation
+
+Starting with the 2025-06-18 version of the MCP Specification, clients must include the "MCP-Protocol-Version" header in all messages
+for the session after the "initialize" message.
+
+The MCP C# SDK includes this header automatically in all messages sent by the client after the "Initialize" message.
