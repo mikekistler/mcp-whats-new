@@ -13,7 +13,7 @@ New features include:
 - [Structured Tool Output](#structured-tool-output)
 - [Elicitation:: Interactive User Engagement](#elicitation-interactive-user-engagement)
 - [Resource links in tool call results](#resource-links-in-tool-call-results)
-- [Negotiated Protocol Version](#negotiated-protocol-version)
+- [Negotiated Protocol Version Header](#negotiated-protocol-version-header)
 
 [2025-06-18 version of the MCP Specification]: https://modelcontextprotocol.io/specification/2025-06-18
 
@@ -41,6 +41,49 @@ The output schema can also inform the LLM about the expected structure of the to
 
 ## Elicitation:: Interactive User Engagement
 
+<!-- SDK PR: https://github.com/modelcontextprotocol/csharp-sdk/pull/467 -->
+
+The new **elicitation** feature enables servers to request additional information from users during interactions. This creates more dynamic and interactive AI experiences.
+
+Servers request structured data from users with JSON schemas to validate responses.
+
+```csharp
+[Tool("create_report")]
+public async Task<ToolResult> CreateReportAsync(
+    [ToolParameter("report_type")] string reportType)
+{
+    // Request additional information from the user
+    var elicitationRequest = new ElicitationRequest
+    {
+        Prompt = "What date range should this report cover?",
+        Parameters = [
+            new ElicitationParameter
+            {
+                Name = "start_date",
+                Type = "string",
+                Description = "Start date in YYYY-MM-DD format"
+            },
+            new ElicitationParameter
+            {
+                Name = "end_date",
+                Type = "string",
+                Description = "End date in YYYY-MM-DD format"
+            }
+        ]
+    };
+
+    var response = await RequestElicitationAsync(elicitationRequest);
+
+    // Use the elicited information to generate the report
+    var report = await GenerateReportAsync(
+        reportType,
+        response.Parameters["start_date"],
+        response.Parameters["end_date"]);
+
+    return new ToolResult { Content = [new TextContent(report)] };
+}
+```
+
 ## Resource links in tool call results
 
 ## Negotiated Protocol Version Header
@@ -52,7 +95,7 @@ Version negotiation is done through the "initialize" message and response which 
 
 [protocol version negotiation]: https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle#version-negotiation
 
-Starting with the 2025-06-18 version of the MCP Specification, clients must include the "MCP-Protocol-Version" header in all messages
-for the session after the "initialize" message.
+Starting with the 2025-06-18 version of the MCP Specification, clients using the streaming HTTP protocol must include the
+"MCP-Protocol-Version" header in all messages for the session after the "initialize" message.
 
 The MCP C# SDK includes this header automatically in all messages sent by the client after the "Initialize" message.
