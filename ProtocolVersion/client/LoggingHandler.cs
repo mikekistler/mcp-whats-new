@@ -11,6 +11,10 @@ public class LoggingHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        // Add a trace id to ensure we can correlate requests to responses
+        var traceId = Guid.NewGuid().ToString();
+        request.Headers.Add("X-Trace-Id", traceId);
+
         // Build a log message for the request
         var requestLog = new System.Text.StringBuilder();
         requestLog.AppendLine($"HTTP Request:\n{request.Method} {request.RequestUri}");
@@ -26,7 +30,7 @@ public class LoggingHandler : DelegatingHandler
         {
             foreach (var header in request.Content.Headers)
             {
-            requestLog.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                requestLog.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
             }
 
             // Add request body
@@ -53,7 +57,7 @@ public class LoggingHandler : DelegatingHandler
         {
             foreach (var header in response.Content.Headers)
             {
-            responseLog.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
+                responseLog.AppendLine($"{header.Key}: {string.Join(", ", header.Value)}");
             }
 
             // Add response body
