@@ -22,7 +22,7 @@ McpClientOptions options = new()
         Elicitation = new()
         {
             ElicitationHandler = HandleElicitationAsync
-         }
+        }
      }
 };
 
@@ -53,6 +53,12 @@ foreach (var block in result.Content)
 // Implement a method that matches the delegate's signature
 async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? requestParams, CancellationToken token)
 {
+    // Bail out if the requestParams is null or if the requested schema has no properties
+    if (requestParams?.RequestedSchema?.Properties == null)
+    {
+        return new ElicitResult();
+    }
+
     // Process the elicitation request
     if (requestParams?.Message is not null)
     {
@@ -62,11 +68,6 @@ async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? reques
     var content = new Dictionary<string, JsonElement>();
 
     // Loop through requestParams.requestSchema.Properties dictionary requesting values for each property
-    if (requestParams?.RequestedSchema?.Properties == null)
-    {
-        return new ElicitResult();
-    }
-
     foreach (var property in requestParams.RequestedSchema.Properties)
     {
         if (property.Value is ElicitRequestParams.BooleanSchema booleanSchema)

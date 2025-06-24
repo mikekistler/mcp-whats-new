@@ -1,0 +1,6 @@
+@ResourceLinks_HostAddress = http://localhost:5048
+
+GET {{ResourceLinks_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

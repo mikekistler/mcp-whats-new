@@ -44,47 +44,153 @@ The output schema can also inform the LLM about the expected structure of the to
 <!-- SDK PR: https://github.com/modelcontextprotocol/csharp-sdk/pull/467 -->
 
 The new **elicitation** feature enables servers to request additional information from users during interactions. This creates more dynamic and interactive AI experiences.
+Servers can request multiple inputs from users at a time, allowing for more complex interactions and data collection,
+but each input must be a "primitive" type (string, number, boolean, etc.) and cannot be nested or complex objects.
 
-Servers request structured data from users with JSON schemas to validate responses.
+Servers request structured data from users with the [ElictAsync] extension method on IMcpServer.
+
+[ElictAsync]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerExtensions.html#ModelContextProtocol_Server_McpServerExtensions_ElicitAsync_ModelContextProtocol_Server_IMcpServer_ModelContextProtocol_Protocol_ElicitRequestParams_System_Threading_CancellationToken_
 
 ```csharp
-[Tool("create_report")]
-public async Task<ToolResult> CreateReportAsync(
-    [ToolParameter("report_type")] string reportType)
+[McpServerTool]
+public async Task<string> GuessTheNumber(
+    IMcpServer server, // Get the McpServer from DI container
+    CancellationToken token
+)
 {
-    // Request additional information from the user
-    var elicitationRequest = new ElicitationRequest
+    // First ask the user if they want to play
+    var playSchema = new RequestSchema
     {
-        Prompt = "What date range should this report cover?",
-        Parameters = [
-            new ElicitationParameter
-            {
-                Name = "start_date",
-                Type = "string",
-                Description = "Start date in YYYY-MM-DD format"
-            },
-            new ElicitationParameter
-            {
-                Name = "end_date",
-                Type = "string",
-                Description = "End date in YYYY-MM-DD format"
-            }
-        ]
+        Properties =
+        {
+            ["Answer"] = new BooleanSchema()
+        }
     };
 
-    var response = await RequestElicitationAsync(elicitationRequest);
+    var playResponse = await server.ElicitAsync(new ElicitRequestParams
+    {
+        Message = "Do you want to play a game?",
+        RequestedSchema = playSchema
+    }, token);
 
-    // Use the elicited information to generate the report
-    var report = await GenerateReportAsync(
-        reportType,
-        response.Parameters["start_date"],
-        response.Parameters["end_date"]);
+    // Check if user wants to play
+    if (playResponse.Action != "accept" || playResponse.Content?["Answer"].ValueKind != JsonValueKind.True)
+    {
+        return "Maybe next time!";
+    }
+```
 
-    return new ToolResult { Content = [new TextContent(report)] };
+The MCP client in the C# SDK can be used to accept and process elicitation requests from an MCP server.
+The MCP host must create the MCP client with the "Elicitation" capability, which specifies a callback to handle elicitation requests.
+
+```csharp
+McpClientOptions options = new()
+{
+    ClientInfo = new()
+    {
+        Name = "ElicitationClient",
+        Version = "1.0.0"
+    },
+    Capabilities = new()
+    {
+        Elicitation = new()
+        {
+            ElicitationHandler = HandleElicitationAsync
+         }
+     }
+};
+
+await using var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
+```
+
+The ElicitationHandler must request input from the user and return the data in a format that matches the requested schema.
+This will be highly dependent on the client application and how it interacts with the user.
+Below is an example of how a console application might handle elicitation requests.
+
+```csharp
+// Implement a method that matches the delegate's signature
+async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? requestParams, CancellationToken token)
+{
+    // Bail out if the requestParams is null or if the requested schema has no properties
+    if (requestParams?.RequestedSchema?.Properties == null)
+    {
+        return new ElicitResult();
+    }
+
+    // Process the elicitation request
+    if (requestParams?.Message is not null)
+    {
+        Console.WriteLine(requestParams.Message);
+    }
+
+    var content = new Dictionary<string, JsonElement>();
+
+    // Loop through requestParams.requestSchema.Properties dictionary requesting values for each property
+    foreach (var property in requestParams.RequestedSchema.Properties)
+    {
+        if (property.Value is ElicitRequestParams.BooleanSchema booleanSchema)
+        {
+            Console.Write($"{booleanSchema.Description}: ");
+            var clientInput = Console.ReadLine();
+            bool parsedBool;
+            if (bool.TryParse(clientInput, out parsedBool))
+            {
+                content[property.Key] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(parsedBool));
+            }
+        }
+        else if (property.Value is ElicitRequestParams.NumberSchema numberSchema)
+        {
+            Console.Write($"{numberSchema.Description}: ");
+            var clientInput = Console.ReadLine();
+            double parsedNumber;
+            if (double.TryParse(clientInput, out parsedNumber))
+            {
+                content[property.Key] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(parsedNumber));
+            }
+        }
+        else if (property.Value is ElicitRequestParams.StringSchema stringSchema)
+        {
+            Console.Write($"{stringSchema.Description}: ");
+            var clientInput = Console.ReadLine();
+            content[property.Key] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(clientInput));
+        }
+    }
+
+    // Return the user's input
+    return new ElicitResult
+    {
+        Content = content
+    };
 }
 ```
 
 ## Resource links in tool call results
+
+<!-- Spec PR: https://github.com/modelcontextprotocol/modelcontextprotocol/pull/603 -->
+<!-- SDK PR: https://github.com/modelcontextprotocol/csharp-sdk/pull/467 -->
+
+Tools can now include **resource links** in their results, allowing clients to easily access related resources.
+One interesting use case is to return a link to a resource that was created by the tool.
+
+```csharp
+[McpServerTool]
+public async Task<CallToolResult> MakeAResource()
+{
+    int id = new Random().Next(1, 101); // 1 to 100 inclusive
+
+    var resource = ResourceGenerator.CreateResource(id);
+
+    var result = new CallToolResult();
+
+    result.Content.Add(new ResourceLinkBlock()
+    {
+        Uri = resource.Uri,
+        Name = resource.Name
+    });
+
+    return result;
+}
+```
 
 ## Negotiated Protocol Version Header
 
