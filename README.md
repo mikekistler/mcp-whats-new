@@ -11,7 +11,7 @@ New features include:
 
 - [New Authentication Protocol](#new-authentication-protocol)
 - [Structured Tool Output](#structured-tool-output)
-- [Elicitation:: Interactive User Engagement](#elicitation-interactive-user-engagement)
+- [Elicitation: Interactive User Engagement](#elicitation-interactive-user-engagement)
 - [Resource links in tool call results](#resource-links-in-tool-call-results)
 - [Negotiated Protocol Version Header](#negotiated-protocol-version-header)
 
@@ -39,7 +39,7 @@ The output schema can also inform the LLM about the expected structure of the to
 [McpServerToolAttribute]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolAttribute.html
 [UseStructuredContent]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolAttribute.html#ModelContextProtocol_Server_McpServerToolAttribute_UseStructuredContent
 
-## Elicitation:: Interactive User Engagement
+## Elicitation: Interactive User Engagement
 
 <!-- SDK PR: https://github.com/modelcontextprotocol/csharp-sdk/pull/467 -->
 
@@ -159,6 +159,7 @@ async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? reques
     // Return the user's input
     return new ElicitResult
     {
+        Action = "accept",
         Content = content
     };
 }
