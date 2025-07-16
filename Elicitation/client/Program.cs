@@ -23,7 +23,7 @@ McpClientOptions options = new()
         {
             ElicitationHandler = HandleElicitationAsync
         }
-     }
+    }
 };
 
 await using var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
