@@ -8,7 +8,7 @@ namespace ResourceLinks.Tools;
 [McpServerToolType]
 public sealed class ResourceTools
 {
-    [McpServerTool]
+    [McpServerTool, Description("Creates a resource with a random value and returns a link to this resource.")]
     public async Task<CallToolResult> MakeAResource()
     {
         int id = new Random().Next(1, 101); // 1 to 100 inclusive

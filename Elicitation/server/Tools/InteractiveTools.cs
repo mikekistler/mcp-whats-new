@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json;
 
 using ModelContextProtocol.Protocol;
@@ -10,6 +11,7 @@ namespace Elicitation.Tools;
 public sealed class InteractiveTools
 {
     [McpServerTool]
+    [Description("A simple game where the user has to guess a number between 1 and 10.")]
     public async Task<string> GuessTheNumber(
         IMcpServer server, // Get the McpServer from DI container
         CancellationToken token
