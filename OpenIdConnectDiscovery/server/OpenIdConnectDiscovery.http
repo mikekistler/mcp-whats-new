@@ -1,6 +1,17 @@
-@OpenIdConnectDiscovery_HostAddress = http://localhost:5225
+@HostAddress = http://localhost:7071
 
-GET {{OpenIdConnectDiscovery_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-06-18
+
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "ping"
+}
 
 ###
+
+GET {{HostAddress}}/.well-known/oauth-protected-resource/
+Accept: application/json
