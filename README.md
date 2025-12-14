@@ -66,6 +66,98 @@ to obtain the necessary authorization.
 - Spec change: [SEP-973](https://modelcontextprotocol/modelcontextprotocol/issues/973)
 - SDK change: [PR #802](https://github.com/modelcontextprotocol/csharp-sdk/pull/802)
 
+The 2025-11-25 version of the MCP Specification adds a list of icons to the metadata for Tools, Resources, Prompts.
+This icon information is included in the response of a `tools/list`, `resources/list`, or `prompts/list` request.
+The Implementation metadata, which describes either a client or a server, has also been extended to include icons and a website URL.
+The C# SDK has been updated to support these fields.
+
+The `IconSource` parameter of `McpServerToolAttribute` can be used to specify a single icon URL for a tool.
+An example usage is shown below.
+
+```csharp
+[McpServerTool(Title = "This is a title", IconSource = "https://example.com/tool-icon.svg")]
+public static string ToolWithIcon(
+```
+
+The `McpServerResourceAttribute`, `McpServerResourceTemplateAttribute`, and `McpServerPromptAttribute` also have an `IconSource` parameter that can be used similarly to specify a single icon URL for resources, resource templates, and prompts, respectively.
+
+For more advanced icon configuration (multiple icons, MIME type specification, size characteristics),
+icons can be specified for a tool programmatically, for example using the `McpServerToolCreateOptions.Icons` property:
+
+```csharp
+    .WithTools([
+        // EchoTool with complex icon configuration demonstrating multiple icons,
+        // MIME types, size specifications, and theme preferences
+        McpServerTool.Create(
+            typeof(EchoTool).GetMethod(nameof(EchoTool.Echo))!,
+            options: new McpServerToolCreateOptions
+            {
+                Icons = [
+                    // High-resolution PNG icon for light theme
+                    new Icon
+                    {
+                        Source = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Loudspeaker/Flat/loudspeaker_flat.svg",
+                        MimeType = "image/svg+xml",
+                        Sizes = ["any"],
+                        Theme = "light"
+                    },
+                    // 3D icon for dark theme
+                    new Icon
+                    {
+                        Source = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Loudspeaker/3D/loudspeaker_3d.png",
+                        MimeType = "image/png",
+                        Sizes = ["256x256"],
+                        Theme = "dark"
+                    },
+                    // WebP format for modern browsers, inline Data URI
+                    new Icon
+                    {
+                        Source = "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=",
+                        MimeType = "image/webp",
+                        Sizes = ["32x32"]
+                    }
+                ]
+            }
+        )
+    ])
+```
+
+The `McpServerResourceCreateOptions`, `McpServerResourceTemplateCreateOptions`, and `McpServerPromptCreateOptions` classes have similar `Icons` properties for specifying icons for resources, resource templates, and prompts, respectively.
+
+Finally, the `Implementation` class also has an `Icons` property that can be used to specify icons,
+and it has a `Website` property to specify a website URL for the implementation metadata.
+These can be set in the `Implementation` object used in the server or client configuration:
+
+```csharp
+    .AddMcpServer(options =>
+    {
+        // Configure server implementation details with icons and website
+        options.ServerInfo = new Implementation
+        {
+            Name = "Everything Server",
+            Version = "1.0.0",
+            Title = "MCP Everything Server",
+            Description = "A comprehensive MCP server demonstrating tools, prompts, resources, sampling, and all MCP features",
+            WebsiteUrl = "https://github.com/modelcontextprotocol/csharp-sdk",
+            Icons = [
+                new Icon
+                {
+                    Source = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Gear/Flat/gear_flat.svg",
+                    MimeType = "image/svg+xml",
+                    Sizes = ["any"],
+                    Theme = "light"
+                },
+                new Icon
+                {
+                    Source = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Gear/3D/gear_3d.png",
+                    MimeType = "image/png",
+                    Sizes = ["256x256"]
+                }
+            ]
+        };
+    })
+```
+
 ## Incremental scope consent via WWW-Authenticate
 
 - Spec change: [SEP-835](https://modelcontextprotocol/modelcontextprotocol/issues/835)
@@ -78,7 +170,7 @@ to obtain the necessary authorization.
 
 ## Add tool calling support to sampling
 
-- Spec channge: [SEP-1577](https://modelcontextprotocol/modelcontextprotocol/issues/1577)
+- Spec change: [SEP-1577](https://modelcontextprotocol/modelcontextprotocol/issues/1577)
 - SDK change: [PR #976](https://github.com/modelcontextprotocol/csharp-sdk/pull/976)
 
 ## Add support for OAuth Client ID Metadata Documents
