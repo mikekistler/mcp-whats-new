@@ -20,17 +20,17 @@ New features in MCP C# SDK for the [2025-11-25 version of the MCP Specification]
 
 See the [Changelog] for the full list of changes.
 
-[2025-11-25 version of the MCP Specification]: https://modelcontextprotocol.io/specification/2025-11-25
-[Changelog]: https://modelcontextprotocol.io/specification/2025-11-25/changelog
+[2025-11-25 version of the MCP Specification]: https://github.com/modelcontextprotocol.io/specification/2025-11-25
+[Changelog]: https://github.com/modelcontextprotocol.io/specification/2025-11-25/changelog
 
 ## Enhance authorization server discovery with support for OpenID Connect Discovery 1.0
 
 - Spec change: [PR #797](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/797)
 - SDK change: [PR #377](https://github.com/modelcontextprotocol/csharp-sdk/pull/377)
 
-The primary change is that in the 06-18 spec, the server was required to provide a link to its
-Protected Resource Metadata (PRM) Document in the `resource_metadata` parameter ofthe WWW-Authenticate header.
-In the 11-25 spec, the server can expose the PRM in any of three ways:
+The primary change is that in the 2025-06-18 spec, the server was required to provide a link to its
+Protected Resource Metadata (PRM) Document in the `resource_metadata` parameter of the `WWW-Authenticate` header.
+In the 2025-11-25 spec, the server can expose the PRM in any of three ways:
 
 1. Via a URL in the `resource_metadata` parameter of the WWW-Authenticate header (as before)
 2. At a "well known" URL
@@ -63,7 +63,8 @@ to obtain the necessary authorization.
 
 ## Icons for tools, resources, resource templates, and prompts
 
-- Spec change: [SEP-973](https://modelcontextprotocol/modelcontextprotocol/issues/973)
+- SEP: [SEP-973](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/973)
+- Spec change: [PR #955](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/955)
 - SDK change: [PR #802](https://github.com/modelcontextprotocol/csharp-sdk/pull/802)
 
 The 2025-11-25 version of the MCP Specification adds a list of icons to the metadata for Tools, Resources, Prompts.
@@ -160,30 +161,77 @@ These can be set in the `Implementation` object used in the server or client con
 
 ## Incremental scope consent via WWW-Authenticate
 
-- Spec change: [SEP-835](https://modelcontextprotocol/modelcontextprotocol/issues/835)
-- SDK change: In progress
+- Spec change: [SEP-835](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/835)
+- SDK change: [PR #1084](https://github.com/modelcontextprotocol/csharp-sdk/pull/1084) <!-- TODO: Check -->
+
+Another important feature of the 2025-11-25 version of the MCP Specification is support for incremental scope consent via the `WWW-Authenticate` header.
+This feature supports the [Principle of Least Privilege] by allowing clients to request only the minimum level of access needed to perform their tasks.
+
+[Principle of Least Privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
+
+MCP uses OAuth 2.0 for authorization, and in Oauth 2.0, _scopes_ define the level of access a client has to a resource.
+Clients request permissions to specific scopes during the authorization process.
+With incremental scope consent, a client can start with minimal scopes and request additional scopes as needed.
+
+Since the 2025-06-18 version of the MCP Specification, MCP servers must expose a Protected Resource Metadata (PRM) Document
+that may include a `scopes_supported` property that lists the scopes they support.
+But clients may not know which scopes are required for specific operations, so might request access to all possible scopes upfront.
+The 2025-11-25 version of the MCP Specification describes recommended practices that let MCP clients request access for a minimal set of scopes initially,
+and then request additional scopes as needed.
+
+The key practices are:
+
+- **Communicating the initial set of scopes**: When a client makes a request to an MCP server without an `Authorization` header, the server responds with a `401 Unauthorized` status code and includes a `WWW-Authenticate` header. Previously this header included a `resource_metadata` parameter pointing to the PRM Document. Now, it can also include a `scopes` parameter that lists the scopes required for the requested operation.
+Clients should request authorization for only these scopes in order to perform the operation.
+
+- **Communicating additional scopes**: When a client makes a request with an `Authorization` header but lacks the necessary scopes for the requested operation, the server responds with a `403 Forbidden` status code. The response should include a `WWW-Authenticate` header with
+
+  - an `error` parameter indicating `insufficient_scope`, and
+  - a `scopes` parameter that lists the additional scopes required.
+
+  Clients will typically request a new access token with the scopes specified in the `scopes` parameter and then retry the operation.
+  Clients then typically continue using this new access token for subsequent requests until it expires or they encounter another `403 Forbidden` response.
+
+Note that both the client and server must support these practices for incremental scope consent to work effectively.
+Here's how the C# SDK helps accomplish this.
+
+### Client support
+
+The MCP C# client SDK automatically handles `WWW-Authenticate` headers with `scopes` parameters in `401 Unauthorized` and `403 Forbidden` responses.
+When the client receives such a response, it extracts the required scopes from the `scopes` parameter and requests authorization for those scopes from the authorization server.
+
+### Server support
+
+
+
+
 
 ## Added support for URL mode elicitation
 
-- Spec change: [SEP-1036](https://modelcontextprotocol/modelcontextprotocol/issues/1036)
+- SEP: [SEP-1036](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1036)
 - SDK change: [PR #1021](https://github.com/modelcontextprotocol/csharp-sdk/pull/1021)
 
 ## Add tool calling support to sampling
 
-- Spec change: [SEP-1577](https://modelcontextprotocol/modelcontextprotocol/issues/1577)
+- SEP: [SEP-1577](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1577)
 - SDK change: [PR #976](https://github.com/modelcontextprotocol/csharp-sdk/pull/976)
 
 ## Add support for OAuth Client ID Metadata Documents
 
-- Spec change: [SEP-991](https://modelcontextprotocol/modelcontextprotocol/issues/991)
+- SEP: [SEP-991](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/991)
+- Spec change: [PR #1296](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1296)
 - SDK change: [PR #1023](https://github.com/modelcontextprotocol/csharp-sdk/pull/1023)
+
+
+
+[OAuth Client ID Metadata Documents](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00)
 
 ## Support for long-running requests over HTTP with polling
 
-- Spec change: [SEP-1699](https://modelcontextprotocol/modelcontextprotocol/issues/1699)
+- SEP: [SEP-1699](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1699)
 - SDK change: In progress
 
 ## An experimental tasks feature for durable requests with polling and deferred result retrieval
 
-- Spec change: [SEP-1686](https://modelcontextprotocol/modelcontextprotocol/issues/1686)
+- SEP: [SEP-1686](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1686)
 - SDK change: In progress
