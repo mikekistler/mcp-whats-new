@@ -209,7 +209,72 @@ When the client receives such a response, it extracts the required scopes from t
 ## Added support for URL mode elicitation
 
 - SEP: [SEP-1036](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1036)
+- Spec change: [PR #887](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/887)
 - SDK change: [PR #1021](https://github.com/modelcontextprotocol/csharp-sdk/pull/1021)
+
+The new URL mode elicitation feature enables secure out-of-band interactions between the server and end-user, bypassing the MCP host/client.
+This is particularly valuable for situations requiring the gathering of sensitive data -— like API keys, third-party authorizations,
+and payment information—that would otherwise pose a security risk if transmitted through the client.
+Inspired by web security standards such as OAuth, this mechanism allows the MCP client to obtain user consent and direct the user’s browser
+to a secure server-hosted URL, where the sensitive interaction takes place away from the client application.
+
+To ensure the security and integrity of the elicitation process, the MCP host/client must present the elicitation request to the user,
+including the identity of the server requesting the information and the purpose of the elicitation, and provide options for the user
+to decline or cancel the elicitation process.
+When the user accepts the elicitation request, the client navigate to the provided URL in a secure manner where the user can complete the necessary interaction.
+
+Support for URL mode elicitation is an optional feature of MCP hosts/clients, and clients indicate their support for this feature
+in the client capabilities sent in the connection initialization.
+Servers should implement fallback mechanisms to handle cases where the client does not support this feature.
+
+### Client support for URL mode elicitation
+
+In the C# SDK, clients can indicate support for URL mode elicitation by setting the `Url` property of `Capabilities.Elicitation`
+in the `McpClientOptions` object used to construct the `McpClient`, as shown below:
+
+```csharp
+McpClientOptions options = new()
+{
+    // ... other options ...
+    Capabilities = new ClientCapabilities
+    {
+        Elicitation = new ElicitationCapability
+        {
+            Url = new UrlElicitationCapability()
+        }
+    }
+```
+
+As with form mode elicitation, the client must provide an `ElicitationHandler` in `McpClientOptions.Handlers`
+when constructing the `McpClient`.
+
+```csharp
+McpClientOptions options = new()
+{
+    // ... other options ...
+    Handlers = new()
+    {
+        ElicitationHandler = HandleElicitationAsync,
+    }
+```
+
+There is only one `ElicitationHandler` for both form mode and URL mode elicitation,
+so the handler should begin by checking the `Mode` property of the `ElicitationRequest` parameter to determine which mode is being requested
+and handle it accordingly.
+
+```csharp
+async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? requestParams, CancellationToken token)
+{
+    // Bail out if the requestParams is null or if the elicitation is not a valid URL mode request
+    if (requestParams is null || requestParams.Mode != "url" || requestParams.Url is null)
+    {
+        return new ElicitResult();
+    }
+```
+
+### Server support for URL mode elicitation
+
+
 
 ## Add tool calling support to sampling
 
