@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Provide Information</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+        button { margin-top: 20px; padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Provide Sensitive Information</h1>
+    <form action="/elicitation-info?id={{ELICITATION_ID}}" method="get">
+        <input type="hidden" name="id" value="{{ELICITATION_ID}}" />
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required />
+
+        <label for="ssn">SSN (last 4 digits):</label>
+        <input type="text" id="ssn" name="ssn" maxlength="4" pattern="\d{4}" required />
+
+        <label for="secret">Secret Code:</label>
+        <input type="password" id="secret" name="secret" required />
+
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
