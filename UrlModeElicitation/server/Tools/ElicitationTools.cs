@@ -17,25 +17,20 @@ internal class ElicitationRequest
 
 internal class ElicitationTools
 {
-    // Static queue to hold pending elicitation requests
-    private static readonly ConcurrentQueue<ElicitationRequest> PendingRequests = new();
+    // Static dictionary to hold pending elicitation requests by ID
+    private static readonly ConcurrentDictionary<string, ElicitationRequest> PendingRequests = new();
 
-    // Static method to access pending requests from endpoint
-    public static bool TryDequeueRequest(out ElicitationRequest? request)
+    // Static method to remove and return a request
+    public static bool TryRemoveRequest(string elicitationId, out ElicitationRequest? request)
     {
-        return PendingRequests.TryDequeue(out request);
-    }
-
-    // Static method to enqueue a request back to the queue
-    public static void EnqueueRequest(ElicitationRequest request)
-    {
-        PendingRequests.Enqueue(request);
+        return PendingRequests.TryRemove(elicitationId, out request);
     }
 
     // Static method to peek at a request without removing it
     public static ElicitationRequest? PeekRequest(string elicitationId)
     {
-        return PendingRequests.FirstOrDefault(r => r.ElicitationId == elicitationId);
+        PendingRequests.TryGetValue(elicitationId, out var request);
+        return request;
     }
 
     [McpServerTool, Description("Trigger URL Mode Elicitation")]
@@ -67,7 +62,7 @@ internal class ElicitationTools
             ElicitationUrl = elicitationUrl,
             CompletionSource = new TaskCompletionSource<Dictionary<string, JsonElement>>()
         };
-        PendingRequests.Enqueue(elicitationRequest);
+        PendingRequests.TryAdd(elicitationId, elicitationRequest);
 
         var elicitResponse = await server.ElicitAsync(new ElicitRequestParams
         {

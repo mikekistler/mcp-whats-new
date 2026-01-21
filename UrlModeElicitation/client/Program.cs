@@ -108,10 +108,27 @@ async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? reques
     // Open a browser to the elicitation URL
     try
     {
-        using var process = new Process();
-        process.StartInfo.UseShellExecute = true;
-        process.StartInfo.FileName = requestParams.Url;
-        process.Start();
+        // In a dev container (Linux environment without a GUI), there's no default browser
+        // to handle the URL. The dev container provides the $BROWSER environment variable
+        // that forwards browser requests to the host machine.
+        var browserCommand = Environment.GetEnvironmentVariable("BROWSER");
+        if (!string.IsNullOrEmpty(browserCommand))
+        {
+            // Use the BROWSER environment variable (common in dev containers)
+            using var process = new Process();
+            process.StartInfo.FileName = browserCommand;
+            process.StartInfo.Arguments = requestParams.Url;
+            process.StartInfo.UseShellExecute = false;
+            process.Start();
+        }
+        else
+        {
+            // Fallback to shell execute
+            using var process = new Process();
+            process.StartInfo.UseShellExecute = true;
+            process.StartInfo.FileName = requestParams.Url;
+            process.Start();
+        }
     }
     catch (Exception ex)
     {

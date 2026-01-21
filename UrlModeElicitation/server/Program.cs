@@ -17,91 +17,67 @@ builder.Services
 var app = builder.Build();
 app.MapMcp();
 
-// Endpoint to directly receive the elicitation information
-app.MapGet("/elicitation-info", HandleElicitationInfo);
+// Endpoint to display the elicitation form
+app.MapGet("/elicitation-info", DisplayElicitationForm);
+
+// Endpoint to receive the elicitation information
+app.MapPost("/elicitation-info", HandleElicitationFormSubmission);
 
 app.Run();
 
-static async Task HandleElicitationInfo(HttpContext context)
+static async Task<IResult> DisplayElicitationForm(string id, HttpContext context)
 {
-    // Get the elicitation ID from query string
-    var elicitationId = context.Request.Query["id"].ToString();
-
-    if (string.IsNullOrEmpty(elicitationId))
+    if (string.IsNullOrEmpty(id))
     {
-        context.Response.StatusCode = 400;
-        await context.Response.WriteAsync("Missing elicitation ID");
-        return;
+        return TypedResults.BadRequest("Missing elicitation ID");
     }
 
-    // Check if this is a GET (display form) or has query parameters (form submission)
-    if (context.Request.Query.Count == 1) // Only "id" parameter
+    // Peek at the queue to verify the ID exists but don't remove it yet
+    var requestExists = ElicitationTools.PeekRequest(id);
+
+    if (requestExists == null)
     {
-        // Just displaying the form - peek at the queue to verify the ID exists
-        // but don't remove it yet
-        var requestExists = ElicitationTools.PeekRequest(elicitationId);
-
-        if (requestExists == null)
-        {
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Elicitation request not found");
-            return;
-        }
-
-        // Display an HTML form to collect user input
-        var formHtml = await File.ReadAllTextAsync("Pages/ElicitationForm.html");
-        formHtml = formHtml.Replace("{{ELICITATION_ID}}", elicitationId);
-
-        context.Response.ContentType = "text/html";
-        await context.Response.WriteAsync(formHtml);
+        return TypedResults.NotFound("Elicitation request not found");
     }
-    else
+
+    // Display an HTML form to collect user input
+    var formHtml = await File.ReadAllTextAsync("Pages/ElicitationForm.html");
+    formHtml = formHtml.Replace("{{ELICITATION_ID}}", id);
+
+    return TypedResults.Content(formHtml, "text/html");
+}
+
+static async Task<IResult> HandleElicitationFormSubmission(string id, HttpContext context)
+{
+    if (string.IsNullOrEmpty(id))
     {
-        // Form was submitted - now we need to find and remove the request
-        ElicitationRequest? matchingRequest = null;
-        var tempQueue = new List<ElicitationRequest>();
-
-        while (ElicitationTools.TryDequeueRequest(out var request))
-        {
-            if (request!.ElicitationId == elicitationId)
-            {
-                matchingRequest = request;
-                break;
-            }
-            tempQueue.Add(request);
-        }
-
-        // Re-enqueue any non-matching requests
-        foreach (var req in tempQueue)
-        {
-            ElicitationTools.EnqueueRequest(req);
-        }
-
-        if (matchingRequest == null)
-        {
-            context.Response.StatusCode = 404;
-            await context.Response.WriteAsync("Elicitation request not found");
-            return;
-        }
-
-        // Form was submitted - extract the user data
-        var userData = new Dictionary<string, JsonElement>();
-        foreach (var param in context.Request.Query)
-        {
-            if (param.Key != "id")
-            {
-                userData[param.Key] = JsonDocument.Parse($"\"{param.Value}\"").RootElement;
-            }
-        }
-
-        // Store the data and signal completion
-        matchingRequest.UserData = userData;
-        matchingRequest.CompletionSource.SetResult(userData);
-
-        // Return success page
-        var successHtml = await File.ReadAllTextAsync("Pages/ElicitationSuccess.html");
-
-        context.Response.ContentType = "text/html";
-        await context.Response.WriteAsync(successHtml);
+        return TypedResults.BadRequest("Missing elicitation ID");
     }
+
+    // Find and remove the matching request
+    if (!ElicitationTools.TryRemoveRequest(id, out var matchingRequest))
+    {
+        return TypedResults.NotFound("Elicitation request not found");
+    }
+
+    // Extract the user data from the form submission
+    var userData = new Dictionary<string, JsonElement>();
+    var form = await context.Request.ReadFormAsync();
+
+    foreach (var field in form)
+    {
+        if (field.Key != "id")
+        {
+            userData[field.Key] = JsonDocument.Parse($"\"{field.Value}\"").RootElement;
+        }
+    }
+
+    // Store the data and signal completion
+    matchingRequest.UserData = userData;
+    matchingRequest.CompletionSource.SetResult(userData);
+
+    // Return success page
+    var successHtml = await File.ReadAllTextAsync("Pages/ElicitationSuccess.html");
+
+    return TypedResults.Content(successHtml, "text/html");
 }
