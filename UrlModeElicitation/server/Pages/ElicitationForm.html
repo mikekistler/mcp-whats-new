@@ -13,6 +13,7 @@
 <body>
     <h1>Provide Sensitive Information</h1>
     <form action="/elicitation-info?id={{ELICITATION_ID}}" method="post">
+        {{ANTIFORGERY_TOKEN}}
         <input type="hidden" name="id" value="{{ELICITATION_ID}}" />
         <label for="name">Name:</label>
         <input type="text" id="name" name="name" required />

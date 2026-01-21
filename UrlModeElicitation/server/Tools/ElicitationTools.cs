@@ -11,8 +11,8 @@ internal class ElicitationRequest
 {
     public string ElicitationId { get; set; } = string.Empty;
     public string ElicitationUrl { get; set; } = string.Empty;
-    public TaskCompletionSource<Dictionary<string, JsonElement>> CompletionSource { get; set; } = new();
-    public Dictionary<string, JsonElement>? UserData { get; set; }
+    public TaskCompletionSource<Dictionary<string, string>> CompletionSource { get; set; } = new();
+    public Dictionary<string, string>? UserData { get; set; }
 }
 
 internal class ElicitationTools
@@ -60,7 +60,7 @@ internal class ElicitationTools
         {
             ElicitationId = elicitationId,
             ElicitationUrl = elicitationUrl,
-            CompletionSource = new TaskCompletionSource<Dictionary<string, JsonElement>>()
+            CompletionSource = new TaskCompletionSource<Dictionary<string, string>>()
         };
         PendingRequests.TryAdd(elicitationId, elicitationRequest);
 
