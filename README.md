@@ -330,7 +330,10 @@ to a secure server-hosted URL, where the sensitive interaction takes place away 
 To ensure the security and integrity of the elicitation process, the MCP host/client must present the elicitation request to the user,
 including the identity of the server requesting the information and the purpose of the elicitation, and provide options for the user
 to decline or cancel the elicitation process.
-When the user accepts the elicitation request, the client navigate to the provided URL in a secure manner where the user can complete the necessary interaction.
+When the user accepts the elicitation request, the client navigates to the provided URL
+in a secure manner where the user can complete the necessary interaction.
+What the server does at the elicitation URL is outside the scope of MCP. The server could, for example,
+present a form for the user to fill out, or redirect the user to a third-party authorization service.
 
 Support for URL mode elicitation is an optional feature of MCP hosts/clients, and clients indicate their support for this feature
 in the client capabilities sent in the connection initialization.
@@ -368,8 +371,8 @@ McpClientOptions options = new()
 ```
 
 There is only one `ElicitationHandler` for both form mode and URL mode elicitation,
-so the handler should begin by checking the `Mode` property of the `ElicitationRequest` parameter to determine which mode is being requested
-and handle it accordingly.
+so the handler should begin by checking the `Mode` property of the `ElicitationRequest` parameter
+to determine which mode is being requested and handle it accordingly.
 
 ```csharp
 async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? requestParams, CancellationToken token)
@@ -383,7 +386,40 @@ async ValueTask<ElicitResult> HandleElicitationAsync(ElicitRequestParams? reques
 
 ### Server support for URL mode elicitation
 
+To support URL mode elicitation, the MCP server must define an endpoint to handle the elicitation response,
+and possibly serve the elicitation URL itself.
+Typically the elicitation response will be submitted via a POST request to the server,
+to ensure that sensitive information is not exposed in URLs or logs.
+If the elicitation URL serves a form for user input, it should include anti-forgery tokens to prevent CSRF attacks.
+The ASP.NET Core framework provides built-in support for anti-forgery.
 
+In an MCP server written using the C# SDK, one way to implement this is to create a Razor Page that serves
+the elicitation URL and handles the elicitation response when the user submits the required information.
+
+```csharp
+public class ElicitationFormModel : PageModel
+{
+    public string ElicitationId { get; set; } = string.Empty;
+
+    public IActionResult OnGet(string id)
+    {
+        // This method serves the elicitation URL when the user navigates to it
+    }
+
+    public async Task<IActionResult> OnPostAsync(string id, string name, string ssn, string secret)
+    {
+        // This method handles the elicitation response when the user submits the form
+    }
+}
+```
+
+Note that both the `OnGet` and `OnPostAsync` methods accept an `id` parameter. This is because an MCP server
+using the Streamable HTTP Transport is inherently multi-tenant, and the server must be able to associate
+the elicitation request and response with the correct MCP request.
+
+The server must maintain state to track pending elicitation requests and match them with incoming responses.
+Then the responses must be communicated back to the MCP request that initiated the elicitation.
+This can be accomplished using in-memory concurrent data structures, a database, or other persistent storage mechanisms.
 
 ## Tool calling support in sampling
 
