@@ -1,10 +1,7 @@
 using System.ComponentModel;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 /// <summary>
@@ -33,31 +30,35 @@ internal class CrapsTools
             return "Error: Client does not support sampling with tools.";
         }
 
+        // Create an IChatClient that wraps sampling and automatically handles tool invocation
+        IChatClient chatClient = ChatClientBuilderChatClientExtensions.AsBuilder(_mcpServer.AsSamplingChatClient())
+            .UseFunctionInvocation()
+            .Build();
+
+        // Define the roll_die tool as an AIFunction
+        AIFunction rollDieTool = AIFunctionFactory.Create(
+            () => Random.Shared.Next(1, 7),
+            name: "roll_die",
+            description: "Rolls a single six-sided die and returns the result (1-6)."
+        );
+
+        var chatOptions = new ChatOptions
+        {
+            Tools = [rollDieTool],
+            ToolMode = ChatToolMode.Auto
+        };
+
         StringBuilder result = new();
         result.AppendLine("Starting a game of Craps...");
 
-        Tool rollDieTool = new Tool()
-        {
-            Name = "roll_die",
-            Description = "Rolls a single six-sided die and returns the result (1-6)."
-        };
-
         // Come out roll
-        var pointRollResponse = await SampleWithToolsAsync(
-            new ()
-            {
-                Messages = [new() {
-                    Role = ModelContextProtocol.Protocol.Role.User,
-                    Content = [new TextContentBlock() { Text = "We are playing a standard game of craps. Roll the dice to establish the point and return the point as a single number. Or return the game result (win/lose)." }]
-                }],
-                MaxTokens = 1000,
-                Tools = [rollDieTool],
-                ToolChoice = new () { Mode = "auto" } // Let the model decide when to use the tool
-            },
+        var pointRollResponse = await chatClient.GetResponseAsync(
+            "We are playing a standard game of craps. Roll the dice to establish the point and return the point as a single number. Or return the game result (win/lose).",
+            chatOptions,
             cancellationToken
         );
 
-        var pointRollText = pointRollResponse.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "No response";
+        var pointRollText = pointRollResponse.Text ?? "No response";
         result.AppendLine($"Come out roll response: {pointRollText}");
 
         // The response will be one of the following:
@@ -101,21 +102,13 @@ internal class CrapsTools
         // Point phase
         while (true)
         {
-            var pointPhaseResponse = await SampleWithToolsAsync(
-                new ()
-                {
-                    Messages = [new() {
-                        Role = ModelContextProtocol.Protocol.Role.User,
-                        Content = [new TextContentBlock() { Text = $"We are playing a standard game of craps. The player has already thrown the come out roll and the point is {point}. Roll the dice and report if the player has won, lost, or should continue." }]
-                    }],
-                    MaxTokens = 1000,
-                    Tools = [rollDieTool],
-                    ToolChoice = new () { Mode = "auto" } // Let the model decide when to use the tool
-                },
+            var pointPhaseResponse = await chatClient.GetResponseAsync(
+                $"We are playing a standard game of craps. The player has already thrown the come out roll and the point is {point}. Roll the dice and report if the player has won, lost, or should continue.",
+                chatOptions,
                 cancellationToken
             );
 
-            var pointPhaseText = pointPhaseResponse.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text ?? "No response";
+            var pointPhaseText = pointPhaseResponse.Text ?? "No response";
             result.AppendLine($"Point phase roll response: {pointPhaseText}");
 
             // Check if game ended
@@ -131,77 +124,6 @@ internal class CrapsTools
             }
 
             // Otherwise continue rolling
-        }
-    }
-
-    // Write a wrapper for SampleAsync that handles tool calls.
-    public async Task<CreateMessageResult> SampleWithToolsAsync(CreateMessageRequestParams requestParams, CancellationToken cancellationToken = default)
-    {
-        const int maxIterations = 10;
-        for (int i = 0; i < maxIterations && !cancellationToken.IsCancellationRequested; i++)
-        {
-            var result = await _mcpServer.SampleAsync(requestParams, cancellationToken);
-
-            if (result.StopReason != "toolUse")
-            {
-                Console.WriteLine($"Sampling completed with result {result.StopReason ?? "unknown"}.");
-                return result;
-            }
-
-            // Note that the LLM might return multiple tool uses in a single response.
-            var toolUses = result.Content.OfType<ToolUseContentBlock>().ToList();
-
-            // Ensure we have a tool use to process.
-            if (toolUses.Count == 0)
-            {
-                Console.WriteLine("Error: Expected tool use content block but none found.");
-                return result;
-            }
-
-            // Push the result content back into the conversation.
-            requestParams.Messages.Add(new SamplingMessage()
-            {
-                Role = ModelContextProtocol.Protocol.Role.Assistant,
-                Content = result.Content.ToList(),
-            });
-
-            // Now execute each tool -- in parallel if multiple.
-            IList<ToolResultContentBlock> toolResults = (await Task.WhenAll(
-                toolUses.Select(async (toolUse) =>
-                {
-                    return await CallToolAsync(toolUse, cancellationToken);
-                })
-            )).ToList<ToolResultContentBlock>();
-
-            requestParams.Messages.Add(new SamplingMessage()
-            {
-                Role = ModelContextProtocol.Protocol.Role.User,
-                Content = toolResults.Cast<ContentBlock>().ToList(),
-            });
-        }
-        throw new InvalidOperationException("Maximum number of tool use iterations reached.");
-    }
-
-    public async Task<ToolResultContentBlock> CallToolAsync(ToolUseContentBlock toolUse, CancellationToken cancellationToken = default)
-    {
-        string toolName = toolUse.Name;
-        _logger.LogInformation("CallToolAsync: Entry for tool {ToolName}", toolName);
-
-        switch (toolName)
-        {
-            case "roll_die":
-                int rollResult = Random.Shared.Next(1, 7);
-                var contentBlock = new TextContentBlock() { Text = rollResult.ToString() };
-                _logger.LogInformation("CallToolAsync: Exit for tool {ToolName} with result {RollResult}", toolName, rollResult);
-                return new ToolResultContentBlock
-                {
-                    ToolUseId = toolUse.Id,
-                    Content = [contentBlock],
-                };
-
-            default:
-                _logger.LogWarning("CallToolAsync: Unknown tool {ToolName}", toolName);
-                throw new ArgumentException($"Unknown tool: {toolName}", nameof(toolName));
         }
     }
 }
