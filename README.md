@@ -694,7 +694,31 @@ if DCR is enabled in the OAuth options.
 ## Support for long-running requests over HTTP with polling
 
 - SEP: [SEP-1699](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1699)
-- SDK change: In progress
+- Spec change: [PR #1783](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1783)
+- SDK change: [PR #1077](https://github.com/modelcontextprotocol/csharp-sdk/pull/1077)
+
+The 2025-11-25 version of the MCP Specification improves support for long-running requests over HTTP.
+At the data layer, MCP is a message-based protocol that places no inherent time limits on request processing.
+However, when using the Streamable HTTP Transport, MCP requests are sent as HTTP requests,
+and HTTP clients and servers often impose timeouts on request processing for reliable operation
+in the event of network failures.
+
+Prior versions of the MCP Specification allowed the client to disconnect from a long-running request
+and later reconnect if the server provides an `Event ID` in events sent in the SSE response stream.
+However, few servers implemented this mechanism, mainly due to the implied obligation to support resumption
+of a stream from any given event ID, all the way back to the start of the stream.
+And even when servers did implement this mechanism, they had to rely on clients to disconnect as servers
+were previously prohibited from disconnecting prior to sending the response of the original request.
+
+With the 2025-11-25 version of the MCP Specification, servers that open an SSE stream for a request
+should begin the stream with an empty event (no data field) that includes an `Event ID` and optionally
+a `Retry After` field. When this is done, servers may close the SSE stream at any time after sending this initial event,
+since the client can later reconnect to the server using the `Event ID` to resume the stream.
+
+To enable this support in the MCP C# SDK, the server must provide the SDK with an `ISseEventStreamStore` implementation
+that stores SSE events that can be retrieved and sent to clients that reconnect to resume a stream.
+The SDK provides a simple in-memory implementation of `ISseEventStreamStore` named `InMemorySseEventStreamStore`.
+that can be used for testing and development purposes.
 
 ## An experimental tasks feature for durable requests with polling and deferred result retrieval
 
