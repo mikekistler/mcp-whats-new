@@ -657,7 +657,51 @@ These are the key aspects of the server-side logic for sampling requests with to
 - Spec change: [PR #1296](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1296)
 - SDK change: [PR #1023](https://github.com/modelcontextprotocol/csharp-sdk/pull/1023)
 
+The 2025-11-25 version of the MCP Specification adds support for [OAuth Client ID Metadata Documents], or CIMDs.
+CIMD is an alternative to Dynamic Client Registration (DCR) for registering a client with an authorization server
+when the client and server have no prior relationship (most common), and is now the preferred method in MCP.
+
+The basic idea of CIMD is that the client specifies a URL as its client_id in requests to the Authorization Server;
+that URL resolves to a JSON document hosted by the client that contains its metadata, such as identifiers and other descriptive information needed by the server.
+When an authorization server encounters such a client_id, it dereferences the URL, retrieves the metadata document, and uses the information
+it finds there to understand and apply policy to the client.
+The complete flow is shown in the [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#client-id-metadata-documents-flows).
+
 [OAuth Client ID Metadata Documents](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00)
+
+Currently just a few Authorization Servers support CIMD, but it is viewed as an easier and more flexible alternative to DCR,
+so it is expected that more Authorization Servers will add support for it over time.
+
+In the MCP C# SDK, clients can specify a CIMD URL in the `ClientMetadataDocumentUri` property of the `ClientOAuthOptions` object
+specified when constructing the `HttpClientTransport` for connecting to the MCP server:
+
+```csharp
+const string ClientMetadataDocumentUrl = $"{ClientUrl}/client-metadata/cimd-client.json";
+
+await using var transport = new HttpClientTransport(new()
+{
+    Endpoint = new(McpServerUrl),
+    OAuth = new ClientOAuthOptions()
+    {
+        RedirectUri = new Uri("http://localhost:1179/callback"),
+        AuthorizationRedirectDelegate = HandleAuthorizationUrlAsync,
+        ClientMetadataDocumentUri = new Uri(ClientMetadataDocumentUrl)
+    },
+}, HttpClient, LoggerFactory);
+```
+
+The CIMD URL must use the HTTPS scheme and must have a non-empty path component.
+It also cannot contain single-dot or double-dot path segments or a fragment component.
+These are requirements specified in the [OAuth Client ID Metadata Documents] spec.
+
+It is the responsibility of the client to host the CIMD document at the specified URL.
+The metadata document MUST include at least the following properties: `client_id`, `client_name`, and `redirect_uris`.
+Other properties commonly included are `client_uri`, `logo_uri`, `grant_types`, and `response_types`.
+
+When the client specifies a CIMD URL in its OAuth options, the MCP C# SDK will attempt to use CIMD to register the client
+with the Authorization Server.
+If the Authorization Server does not support CIMD, the client will fall back to using Dynamic Client Registration (DCR)
+if DCR is enabled in the OAuth options.
 
 ## Support for long-running requests over HTTP with polling
 
