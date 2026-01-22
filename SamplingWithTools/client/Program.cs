@@ -44,9 +44,7 @@ var mcpClient = await McpClient.CreateAsync(
         {
             SamplingHandler = async (c, p, t) =>
             {
-                // Console.WriteLine("Forwarding sampling request to underlying chat client...");
-                var result = await samplingHandler(c, p, t);
-                return result;
+                return await samplingHandler(c, p, t);
             },
         }
     });

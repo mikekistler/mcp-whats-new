@@ -27,6 +27,12 @@ internal class CrapsTools
     {
         _logger.LogInformation("PlayCraps: Entry");
 
+        if (_mcpServer?.ClientCapabilities?.Sampling?.Tools is not {})
+        {
+            _logger.LogWarning("PlayCraps: Exit - client does not support sampling with tools");
+            return "Error: Client does not support sampling with tools.";
+        }
+
         StringBuilder result = new();
         result.AppendLine("Starting a game of Craps...");
 
@@ -180,10 +186,6 @@ internal class CrapsTools
     {
         string toolName = toolUse.Name;
         _logger.LogInformation("CallToolAsync: Entry for tool {ToolName}", toolName);
-
-        // toolUse.Input is a JsonElement representing the arguments.
-        // We need to convert it to a dictionary for the tool call.
-        var arguments = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(toolUse.Input.ToString() ?? "{}");
 
         switch (toolName)
         {

@@ -424,15 +424,238 @@ This can be accomplished using in-memory concurrent data structures, a database,
 ## Tool calling support in sampling
 
 - SEP: [SEP-1577](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1577)
+- Spec change: [PR #1796](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1796)
 - SDK change: [PR #976](https://github.com/modelcontextprotocol/csharp-sdk/pull/976)
+
+Another major feature of the 2025-11-25 version of the MCP Specification is the addition of tool calling support to sampling.
+This allows servers to include tools in their sampling requests, which the LLM may invoke to help produce a response.
+
+This might sound straightforward, since providing tools to LLMs is a central feature of MCP.
+But the tools provided in sampling requests are fundamentally different from standard MCP tools,
+despite the fact that they are represented using the same MCP Tool metadata structure.
+Tools in sampling requests do not need to be, and often are not, implemented as standard MCP tools
+by the server. So the server must implement its own logic to handle tool invocations for sampling requests.
+
+It's also important to understand the high-level flow of a sampling request with tools.
+When the LLM requests a tool invocation for a sampling request, this is the _response_ to the sampling request.
+So the server must perform the tool invocation and then issue a new sampling request, including both the tool call request
+and the tool call response, to continue the sampling process. This continues until the LLM produces a final response
+-- a response that does not include any tool invocation requests.
+
+There is also new logic needed in MCP clients/hosts to handle tool invocations in sampling requests and responses.
+This is because MCP client and server use MCP specific messages to represent tool invocation requests and responses,
+but most LLMs use their own specific formats for tool invocation requests and responses, and the MCP client/host
+must translate between these formats. This can get confusing because many of the structures have similar names (e.g. message, role)
+but may have different meanings in MCP and in the LLM's tool calling format.
+
+With all that said, the MCP C# SDK provides foundational support for tool calling in sampling requests.
+The following sections describe how to use this support in MCP clients/hosts and servers.
+
+### Client/host support for tool calling in sampling
+
+Clients indicate that they support tool calling in sampling by setting the "sampling" property of its client capabilities,
+and within that, setting the "tools" property to an empty object.
+In the C# SDK, this is done in `Capabilities` property of `McpClientOptions` passed to the `CreateAsync` method of `McpClient`.
+Clients that declare support for sampling must also provide a `SamplingHandler` in the `Handlers` property of `McpClientOptions`.
+This is illustrated in the code snippet below.
+
+```csharp
+// Configure it to connect to the SamplingWithTools MCP server.
+var mcpClient = await McpClient.CreateAsync(
+    new HttpClientTransport(new()
+    {
+        Endpoint = new Uri("http://localhost:6184"),
+        Name = "SamplingWithTools MCP Server",
+    }),
+    clientOptions: new()
+    {
+        Capabilities = new ClientCapabilities
+        {
+            Sampling = new SamplingCapability
+            {
+                Tools = new SamplingToolsCapability {}
+            }
+        },
+        Handlers = new()
+        {
+            SamplingHandler = async (c, p, t) =>
+            {
+                return await samplingHandler(c, p, t);
+            },
+        }
+    });
+```
+
+The `SamplingHandler` is invoked whenever the server sends a sampling request to the client.
+The handler must process the sampling request, including any tool invocation requests,
+and return the final sampling response to the server.
+
+The `SamplingHandler` could be a difficult piece of logic to implement, depending on the LLM being used.
+Fortunately for clients written in C#, there is a sompling handler implementation provided by the
+`IChatClient` interface of the `Microsoft.Extensions.AI` package.
+You can obtain an `IChatClient` from an LLM chat client using the `AsIChatClient` extension method, as shown below.
+Then use the `CreateSamplingHandler` method of `IChatClient` to obtain a sampling handler that understands
+how to translate the LLM tool invocation format to and from MCP tool invocation messages.
+
+```csharp
+IChatClient chatClient =
+    new OpenAIClient(new ApiKeyCredential(token), new OpenAIClientOptions { Endpoint = new Uri(baseUrl) })
+        .GetChatClient(modelId)
+        .AsIChatClient();
+
+var samplingHandler = chatClient.CreateSamplingHandler();
+```
+
+That's all that is needed on the client/host side to support tool calling in sampling requests.
+
+### Server support for tool calling in sampling
+
+Servers can take advantage of the tool calling support in sampling if they are connected to a client/host
+that also supports this feature. The capabilities of the client are available in the `McpServer.ClientCapabilities` property.
+The following code snippet shows how to check for support for tool calling in sampling.
+
+```csharp
+if (_mcpServer?.ClientCapabilities?.Sampling?.Tools is not {})
+{
+    _logger.LogWarning("PlayCraps: Exit - client does not support sampling with tools");
+    return "Error: Client does not support sampling with tools.";
+}
+```
+
+When a server wants to send a sampling request with tools to the client, it constructs a `CreateMessageRequestParams` object
+that includes the list of `Tool` objects to include in the request and sends this to client using the `SampleAsync` method of `McpServer`.
+This `Tool` structure is the same as the one used in standard MCP tool metadata,
+containing a tool name, description, and parameters schema.
+The following code snippet shows a simple example of constructing a Tool object to be included in a sampling request.
+
+```csharp
+Tool rollDieTool = new Tool()
+{
+    Name = "roll_die",
+    Description = "Rolls a single six-sided die and returns the result (1-6)."
+};
+```
+
+But tools included in sampling requests do not need to be implemented as standard MCP tools by the server,
+and typically are not. And they work a bit differently from standard MCP tools, in that the input to a sampling tool
+is a `ToolUseContentBlock` from the LLM, and the output is list of `ToolResultContentBlock` objects.
+So the server must implement its own logic process tool invocations, dispatching to the appropriate tool implementation based on the tool name.
+The following code snippet illustrates a simple implementation of this logic.
+
+```csharp
+    switch (toolName)
+    {
+        case "roll_die":
+            int rollResult = Random.Shared.Next(1, 7);
+            var contentBlock = new TextContentBlock() { Text = rollResult.ToString() };
+            _logger.LogInformation("CallToolAsync: Exit for tool {ToolName} with result {RollResult}", toolName, rollResult);
+            return new ToolResultContentBlock
+            {
+                ToolUseId = toolUse.Id,
+                Content = [contentBlock],
+            };
+
+        default:
+            _logger.LogWarning("CallToolAsync: Unknown tool {ToolName}", toolName);
+            throw new ArgumentException($"Unknown tool: {toolName}", nameof(toolName));
+    }
+```
+
+Unlike a sampling request without tools, the server must implement logic to handle tool invocation requests
+sent by the client in response to the sampling request.
+Typicially this takes the form of a loop that continues sending sampling requests to the client
+until a final response is received (i.e., a response that does not include any tool invocation requests).
+
+When the sampling response from the client includes a tool invocation request, the server must execute the requested tool
+and then send a new sampling request to the client that includes:
+- The original sampling request messages
+- A message representing the tool invocation request
+- A message representing the tool invocation response
+
+Note that the sampling response may include multiple tool invocation requests, and the server should execute each requested tool
+and include all the tool invocation requests and responses in the next sampling request to the client.
+
+The process repeats, with the collection of messages growing with each tool invocation,
+until the client returns a final response.
+
+Here's a code snippet illustrating this process.
+
+```csharp
+const int maxIterations = 10;
+for (int i = 0; i < maxIterations && !cancellationToken.IsCancellationRequested; i++)
+{
+    var result = await _mcpServer.SampleAsync(requestParams, cancellationToken);
+
+    if (result.StopReason != "toolUse")
+    {
+        Console.WriteLine($"Sampling completed with result {result.StopReason ?? "unknown"}.");
+        return result;
+    }
+
+    // Note that the LLM might return multiple tool uses in a single response.
+    var toolUses = result.Content.OfType<ToolUseContentBlock>().ToList();
+
+    // Ensure we have a tool use to process.
+    if (toolUses.Count == 0)
+    {
+        Console.WriteLine("Error: Expected tool use content block but none found.");
+        return result;
+    }
+
+    // Push the result content back into the conversation.
+    requestParams.Messages.Add(new SamplingMessage()
+    {
+        Role = ModelContextProtocol.Protocol.Role.Assistant,
+        Content = result.Content.ToList(),
+    });
+
+    // Now execute each tool -- in parallel if multiple.
+    IList<ToolResultContentBlock> toolResults = (await Task.WhenAll(
+        toolUses.Select(async (toolUse) =>
+        {
+            return await CallToolAsync(toolUse, cancellationToken);
+        })
+    )).ToList<ToolResultContentBlock>();
+
+    requestParams.Messages.Add(new SamplingMessage()
+    {
+        Role = ModelContextProtocol.Protocol.Role.User,
+        Content = toolResults.Cast<ContentBlock>().ToList(),
+    });
+}
+throw new InvalidOperationException("Maximum number of tool use iterations reached.");
+```
+
+This logic could be encapsulated in a helper method to simplify its reuse. If this method were named `SampleWithToolsAsync`,
+then the server could use it to send a sampling request with tools as shown below.
+
+```csharp
+var pointRollResponse = await SampleWithToolsAsync(
+    new ()
+    {
+        Messages = [new() {
+            Role = ModelContextProtocol.Protocol.Role.User,
+            Content = [new TextContentBlock() { Text = "We are playing a standard game of craps. Roll the dice to establish the point and return the point as a single number. Or return the game result (win/lose)." }]
+        }],
+        MaxTokens = 1000,
+        Tools = [rollDieTool],
+        ToolChoice = new () { Mode = "auto" } // Let the model decide when to use the tool
+    },
+    cancellationToken
+);
+```
+
+The `MaxTokens` property is helpful to limit the total number of tokens used in the sampling process,
+and the `ToolChoice` property indicates how the LLM should use the provided tools.
+The "auto" mode lets the LLM decide when to use the tools, while the "always" mode forces the LLM to use a tool at every opportunity.
+
+These are the key aspects of the server-side logic for sampling requests with tools using the MCP C# SDK.
 
 ## Support for OAuth Client ID Metadata Documents
 
 - SEP: [SEP-991](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/991)
 - Spec change: [PR #1296](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1296)
 - SDK change: [PR #1023](https://github.com/modelcontextprotocol/csharp-sdk/pull/1023)
-
-
 
 [OAuth Client ID Metadata Documents](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00)
 
