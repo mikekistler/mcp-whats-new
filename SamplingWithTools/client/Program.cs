@@ -21,7 +21,7 @@ IChatClient chatClient =
         .GetChatClient(modelId)
         .AsIChatClient()
         .AsBuilder()
-        .UseFunctionInvocation()
+        .UseFunctionInvocation()     // Commenting out this link make the program not use tools.
         .Build();
 
 var samplingHandler = chatClient.CreateSamplingHandler();
@@ -49,20 +49,19 @@ var mcpClient = await McpClient.CreateAsync(
         }
     });
 
-// List all available tools from the MCP server.
-Console.WriteLine("Available tools:");
+// Retrieve the list of available tools from the server.
 IList<McpClientTool> tools = await mcpClient.ListToolsAsync();
-foreach (McpClientTool tool in tools)
-{
-    Console.WriteLine($"{tool}");
-}
+
+const string defaultPrompt = "Play a single game of craps. Continue until the game is won or lost. Report the results of each roll and the final outcome.";
 
 // Conversational loop that can utilize the tools via prompts.
 List<ChatMessage> messages = [];
 while (true)
 {
-    Console.Write("Prompt: ");
-    messages.Add(new(ChatRole.User, Console.ReadLine()));
+    Console.Write("Prompt (or just enter to play a game of craps): ");
+
+    var input = Console.ReadLine();
+    messages.Add(new(ChatRole.User, string.IsNullOrEmpty(input) ? defaultPrompt : input));
 
     List<ChatResponseUpdate> updates = [];
     await foreach (ChatResponseUpdate update in chatClient

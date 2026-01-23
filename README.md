@@ -448,7 +448,8 @@ but most LLMs use their own specific formats for tool invocation requests and re
 must translate between these formats. This can get confusing because many of the structures have similar names (e.g. message, role)
 but may have different meanings in MCP and in the LLM's tool calling format.
 
-With all that said, the MCP C# SDK provides foundational support for tool calling in sampling requests.
+With all that said, the MCP C# SDK, in conjunction with the `Microsoft.Extensions.AI` package,
+provides comprehensive support for tool calling in sampling requests that abstracts away much of the complexity.
 The following sections describe how to use this support in MCP clients/hosts and servers.
 
 ### Client/host support for tool calling in sampling
