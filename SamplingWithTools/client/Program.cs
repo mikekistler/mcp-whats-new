@@ -15,14 +15,14 @@ if (string.IsNullOrEmpty(token))
 var baseUrl = "https://models.github.ai/inference";
 var modelId = "gpt-4o-mini";
 
-// Create a chat client that automatically handles function invocation
-IChatClient chatClient =
-    new OpenAIClient(new ApiKeyCredential(token), new OpenAIClientOptions { Endpoint = new Uri(baseUrl) })
-        .GetChatClient(modelId)
-        .AsIChatClient()
-        .AsBuilder()
-        .UseFunctionInvocation()     // Commenting out this link make the program not use tools.
-        .Build();
+// Create a chat client with middleware pipeline using the fluent builder pattern.
+IChatClient chatClient = new ChatClientBuilder(
+        new OpenAIClient(new ApiKeyCredential(token), new OpenAIClientOptions { Endpoint = new Uri(baseUrl) })
+            .GetChatClient(modelId)
+            .AsIChatClient())
+    .UseFunctionInvocation()
+    .Use(inner => new SamplingApprovalMiddleware(inner))
+    .Build();
 
 var samplingHandler = chatClient.CreateSamplingHandler();
 
