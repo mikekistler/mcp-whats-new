@@ -53,9 +53,9 @@ public class ApprovalManager
     /// <summary>
     /// Requests user approval for a tool call. Results are cached by tool name.
     /// </summary>
-    public bool RequestToolApproval(FunctionCallContent toolCall)
+    public bool RequestToolApproval(string toolName, string? callId, System.Text.Json.JsonElement? input)
     {
-        var toolName = toolCall.Name ?? "unknown";
+        toolName ??= "unknown";
 
         if (_toolApprovals.TryGetValue(toolName, out var cachedApproval))
         {
@@ -66,14 +66,10 @@ public class ApprovalManager
         // Display the tool call details
         Console.WriteLine();
         Console.WriteLine($"  Tool: {toolName}");
-        Console.WriteLine($"  Call ID: {toolCall.CallId}");
-        if (toolCall.Arguments != null)
+        Console.WriteLine($"  Call ID: {callId}");
+        if (input.HasValue)
         {
-            Console.WriteLine("  Arguments:");
-            foreach (var arg in toolCall.Arguments)
-            {
-                Console.WriteLine($"    {arg.Key}: {arg.Value}");
-            }
+            Console.WriteLine($"  Input: {input.Value}");
         }
         Console.Write($"  Approve tool call '{toolName}'? (y/n/always/never): ");
 
