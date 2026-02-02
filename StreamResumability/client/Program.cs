@@ -1,2 +1,59 @@
-// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using System.Diagnostics;
+
+// Parse command line argument for delay in seconds
+int delayInSeconds = 0;
+if (args.Length > 0 && int.TryParse(args[0], out int parsedDelay))
+{
+    delayInSeconds = parsedDelay;
+}
+
+var endpoint = Environment.GetEnvironmentVariable("ENDPOINT") ?? "http://localhost:6173";
+
+var clientTransport = new HttpClientTransport(new()
+{
+    Endpoint = new Uri(endpoint),
+    TransportMode = HttpTransportMode.StreamableHttp,
+});
+
+McpClientOptions options = new()
+{
+    ClientInfo = new()
+    {
+        Name = "CSharpClient",
+        Version = "1.0.0"
+    }
+};
+
+await using var mcpClient = await McpClient.CreateAsync(clientTransport, options);
+
+var tools = await mcpClient.ListToolsAsync();
+Console.WriteLine($"Connected to server with tools: {string.Join(", ", tools.Select(t => t.Name))}");
+
+// Set delay if specified
+if (delayInSeconds > 0)
+{
+    Console.WriteLine($"Setting delay to {delayInSeconds} seconds");
+    var setDelayArgs = new Dictionary<string, object?>
+    {
+        { "delayInSeconds", delayInSeconds }
+    };
+    await mcpClient.CallToolAsync(toolName: "set_delay", arguments: setDelayArgs);
+}
+
+// Call the get_random_number tool and print the result and duration of the call
+
+{
+    Console.WriteLine($"Calling get_random_number");
+
+    var stopwatch = Stopwatch.StartNew();
+    var numberResult = await mcpClient.CallToolAsync(toolName: "get_random_number");
+    stopwatch.Stop();
+
+    Console.Write($"Result of get_random_number call: ");
+    var textBlock = numberResult.Content.OfType<TextContentBlock>().First();
+    Console.WriteLine(textBlock.Text);
+
+    Console.WriteLine($"get_random_number call completed in {stopwatch.ElapsedMilliseconds / 1000.0} s");
+}
