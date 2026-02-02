@@ -30,16 +30,28 @@ var approvalManager = new ApprovalManager();
 Func<CreateMessageRequestParams?, IProgress<ProgressNotificationValue>, CancellationToken, ValueTask<CreateMessageResult>> samplingHandler =
     async (request, progress, cancellationToken) =>
     {
-        // === BEFORE: Ask user to approve the sampling request ===
+        // === BEFORE: Ask user to approve the sampling request (whether or not it involves tool calls) ===
         if (request?.Messages != null)
         {
-            var chatMessages = request.Messages.Select(m => new ChatMessage(
-                m.Role == Role.User ? ChatRole.User : ChatRole.Assistant,
-                m.Content.OfType<TextContentBlock>().Select(c => c.Text).FirstOrDefault() ?? ""));
-
-            if (!approvalManager.RequestSamplingApproval(chatMessages))
+            if (!approvalManager.RequestSamplingApproval(request.Messages))
             {
                 throw new OperationCanceledException("User rejected the sampling request.");
+            }
+        }
+
+        // === BEFORE: Ask user to approve any tool results in the message history ===
+        if (request?.Messages != null)
+        {
+            // Check for tool results in the request messages and prompt for approval
+            var toolResults = request.Messages
+                .SelectMany(m => m.Content.OfType<ToolResultContentBlock>())
+                .ToList();
+            foreach (var toolResult in toolResults)
+            {
+                if (!approvalManager.RequestToolResultApproval(toolResult.ToolUseId, toolResult.ToolUseId, toolResult.Content))
+                {
+                    throw new OperationCanceledException($"User rejected tool result for: {toolResult.ToolUseId}");
+                }
             }
         }
 
@@ -49,11 +61,6 @@ Func<CreateMessageRequestParams?, IProgress<ProgressNotificationValue>, Cancella
         var toolCalls = result.Content.OfType<ToolUseContentBlock>().ToList();
         if (toolCalls.Count > 0)
         {
-            Console.WriteLine();
-            Console.WriteLine("╔══════════════════════════════════════════════════════════════╗");
-            Console.WriteLine("║  SAMPLING RESPONSE CONTAINS TOOL CALLS                       ║");
-            Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
-
             foreach (var toolCall in toolCalls)
             {
                 if (!approvalManager.RequestToolApproval(toolCall.Name, toolCall.Id, toolCall.Input))

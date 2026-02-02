@@ -48,15 +48,15 @@ internal class CrapsTools
             ToolMode = ChatToolMode.Auto
         };
 
-        StringBuilder result = new();
-        result.AppendLine("Starting a game of Craps...");
-
         // Come out roll
         var pointRollResponse = await chatClient.GetResponseAsync(
             "We are playing a standard game of craps. Roll the dice to establish the point and return the point as a single number. Or return the game result (win/lose).",
             chatOptions,
             cancellationToken
         );
+
+        StringBuilder result = new();
+        result.AppendLine("Starting a game of Craps...");
 
         var pointRollText = pointRollResponse.Text ?? "No response";
         result.AppendLine($"Come out roll response: {pointRollText}");

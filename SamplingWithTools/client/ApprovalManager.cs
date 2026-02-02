@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.AI;
+using ModelContextProtocol.Protocol;
 
 /// <summary>
 /// Manages user approvals for sampling requests and tool calls, with caching support.
@@ -12,7 +12,7 @@ public class ApprovalManager
     /// <summary>
     /// Requests user approval for a sampling call. Results are cached by a key derived from the messages.
     /// </summary>
-    public bool RequestSamplingApproval(IEnumerable<ChatMessage> messages)
+    public bool RequestSamplingApproval(IList<SamplingMessage> messages)
     {
         // Create a cache key based on message content
         var cacheKey = GenerateSamplingCacheKey(messages);
@@ -24,17 +24,11 @@ public class ApprovalManager
         }
 
         // Display the sampling request
-        Console.WriteLine();
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  MCP SERVER REQUESTING SAMPLING                              ║");
-        Console.WriteLine("╠══════════════════════════════════════════════════════════════╣");
-        Console.WriteLine($"║  Messages: {messages.Count()}");
+        Console.WriteLine($"  Messages: {messages.Count()}");
         foreach (var msg in messages)
         {
-            var preview = msg.Text?.Length > 50 ? msg.Text[..50] + "..." : msg.Text;
-            Console.WriteLine($"║  [{msg.Role}]: {preview}");
+            Console.WriteLine($"  {msg.GetPreview()}");
         }
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
         Console.Write("Approve this sampling request? (y/n/always/never): ");
 
         var approval = Console.ReadLine()?.Trim().ToLowerInvariant();
@@ -53,7 +47,7 @@ public class ApprovalManager
     /// <summary>
     /// Requests user approval for a tool call. Results are cached by tool name.
     /// </summary>
-    public bool RequestToolApproval(string toolName, string? callId, System.Text.Json.JsonElement? input)
+    public bool RequestToolApproval(string toolName, string? toolUseId, System.Text.Json.JsonElement? input)
     {
         toolName ??= "unknown";
 
@@ -66,7 +60,7 @@ public class ApprovalManager
         // Display the tool call details
         Console.WriteLine();
         Console.WriteLine($"  Tool: {toolName}");
-        Console.WriteLine($"  Call ID: {callId}");
+        Console.WriteLine($"  Tool Use ID: {toolUseId}");
         if (input.HasValue)
         {
             Console.WriteLine($"  Input: {input.Value}");
@@ -87,6 +81,48 @@ public class ApprovalManager
     }
 
     /// <summary>
+    /// Requests user approval for a tool result being passed to the LLM. Results are cached by tool name.
+    /// </summary>
+    public bool RequestToolResultApproval(string? toolName, string? toolUseId, IEnumerable<object>? content)
+    {
+        toolName ??= "unknown";
+
+        if (_toolApprovals.TryGetValue($"result:{toolName}", out var cachedApproval))
+        {
+            Console.WriteLine($"[Cached] Using cached approval for tool result '{toolName}': {(cachedApproval ? "approved" : "rejected")}");
+            return cachedApproval;
+        }
+
+        // Display the tool result details
+        Console.WriteLine();
+        Console.WriteLine($"  Tool: {toolName}");
+        Console.WriteLine($"  Tool Use ID: {toolUseId}");
+        if (content != null)
+        {
+            foreach (var item in content)
+            {
+                var preview = item?.ToString();
+                if (preview?.Length > 60)
+                    preview = preview[..60] + "...";
+                Console.WriteLine($"  Content: {preview}");
+            }
+        }
+        Console.Write($"Approve tool result '{toolName}'? (y/n/always/never): ");
+
+        var approval = Console.ReadLine()?.Trim().ToLowerInvariant();
+        var isApproved = approval == "y" || approval == "yes" || approval == "always";
+
+        // Cache the result for this tool
+        if (approval == "always" || approval == "never")
+        {
+            _toolApprovals[$"result:{toolName}"] = isApproved;
+            Console.WriteLine($"[Cached] Tool result '{toolName}' approval cached as: {(isApproved ? "always approve" : "never approve")}");
+        }
+
+        return isApproved;
+    }
+
+    /// <summary>
     /// Clears all cached approvals.
     /// </summary>
     public void ClearCache()
@@ -96,13 +132,14 @@ public class ApprovalManager
         Console.WriteLine("[Cache cleared]");
     }
 
-    private static string GenerateSamplingCacheKey(IEnumerable<ChatMessage> messages)
+    private static string GenerateSamplingCacheKey(IList<SamplingMessage> messages)
     {
         // Create a simple hash based on the first message's content
         var firstMessage = messages.FirstOrDefault();
-        if (firstMessage?.Text != null)
+        var textContent = firstMessage?.Content?.OfType<TextContentBlock>().FirstOrDefault()?.Text;
+        if (textContent != null)
         {
-            return $"sampling:{firstMessage.Role}:{firstMessage.Text.GetHashCode()}";
+            return $"sampling:{firstMessage!.Role}:{textContent.GetHashCode()}";
         }
         return $"sampling:{messages.Count()}";
     }
