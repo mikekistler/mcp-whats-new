@@ -9,6 +9,13 @@ if (args.Length > 0 && int.TryParse(args[0], out int parsedDelay))
     delayInSeconds = parsedDelay;
 }
 
+// Parse command line argument for retry interval
+int retryIntervalInSeconds = 0;
+if (args.Length > 1 && int.TryParse(args[1], out int parsedRetryInterval))
+{
+    retryIntervalInSeconds = parsedRetryInterval;
+}
+
 var endpoint = Environment.GetEnvironmentVariable("ENDPOINT") ?? "http://localhost:6173";
 
 var clientTransport = new HttpClientTransport(new()
@@ -32,12 +39,13 @@ var tools = await mcpClient.ListToolsAsync();
 Console.WriteLine($"Connected to server with tools: {string.Join(", ", tools.Select(t => t.Name))}");
 
 // Set delay if specified
-if (delayInSeconds > 0)
+if (delayInSeconds > 0 || retryIntervalInSeconds > 0)
 {
-    Console.WriteLine($"Setting delay to {delayInSeconds} seconds");
+    Console.WriteLine($"Setting delay to {delayInSeconds} seconds and retry interval to {retryIntervalInSeconds} seconds");
     var setDelayArgs = new Dictionary<string, object?>
     {
-        { "delayInSeconds", delayInSeconds }
+        { "delayInSeconds", delayInSeconds },
+        { "retryIntervalInSeconds", retryIntervalInSeconds }
     };
     await mcpClient.CallToolAsync(toolName: "set_delay", arguments: setDelayArgs);
 }

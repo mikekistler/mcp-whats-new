@@ -15,13 +15,7 @@ public sealed class SimpleSseEventStreamStore : ISseEventStreamStore
     private readonly List<string> _storedEventIds = [];
     private readonly List<TimeSpan> _storedReconnectionIntervals = [];
     private readonly object _storedEventIdsLock = new();
-    private int _storeEventCallCount;
     private long _globalSequence;
-
-    /// <summary>
-    /// Gets the number of times events have been stored.
-    /// </summary>
-    public int StoreEventCallCount => _storeEventCallCount;
 
     /// <summary>
     /// Gets the list of stored event IDs in order.
@@ -83,6 +77,36 @@ public sealed class SimpleSseEventStreamStore : ISseEventStreamStore
         return new ValueTask<ISseEventStreamReader?>(reader);
     }
 
+    /// <summary>
+    /// Deletes all streams associated with the specified session ID.
+    /// </summary>
+    /// <param name="sessionId">The session ID whose streams should be deleted.</param>
+    public void DeleteStreamsForSession(string sessionId)
+    {
+        // Find all stream keys that belong to this session
+        var keysToRemove = _streams.Keys.Where(key => key.StartsWith($"{sessionId}:")).ToList();
+
+        foreach (var key in keysToRemove)
+        {
+            if (_streams.TryRemove(key, out var streamState))
+            {
+                // Remove all event lookups associated with this stream
+                var eventIdsToRemove = _eventLookup
+                    .Where(kvp => kvp.Value.Stream == streamState)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var eventId in eventIdsToRemove)
+                {
+                    _eventLookup.TryRemove(eventId, out _);
+                }
+
+                // Complete the stream to signal any waiting readers
+                streamState.Complete();
+            }
+        }
+    }
+
     private string GenerateEventId() => Interlocked.Increment(ref _globalSequence).ToString();
 
     private void TrackEvent(string eventId, StreamState stream, long sequence, TimeSpan? reconnectionInterval = null)
@@ -96,7 +120,6 @@ public sealed class SimpleSseEventStreamStore : ISseEventStreamStore
                 _storedReconnectionIntervals.Add(reconnectionInterval.Value);
             }
         }
-        Interlocked.Increment(ref _storeEventCallCount);
     }
 
     private static string GetStreamKey(string sessionId, string streamId) => $"{sessionId}:{streamId}";
