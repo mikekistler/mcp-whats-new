@@ -1,7 +1,12 @@
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Create the event stream store so we can reference it in the session handler
-var eventStreamStore = new SimpleSseEventStreamStore();
+// Create a distributed cache and event stream store so we can reference it in the session handler
+var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
+var eventStreamStore = new SessionTrackingEventStreamStore(cache);
 
 // Add the MCP services: the transport to use (http) and the tools to register.
 builder.Services
@@ -21,7 +26,7 @@ builder.Services
                 // Delete all streams associated with this session when it ends
                 if (!string.IsNullOrEmpty(mcpServer.SessionId))
                 {
-                    eventStreamStore.DeleteStreamsForSession(mcpServer.SessionId);
+                    await eventStreamStore.DeleteStreamsForSessionAsync(mcpServer.SessionId);
                 }
             }
         };
