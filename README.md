@@ -717,35 +717,32 @@ should begin the stream with an empty event (no data field) that includes an `Ev
 a `Retry After` field. When this is done, servers may close the SSE stream at any time after sending this initial event,
 since the client can later reconnect to the server using the `Event ID` to resume the stream.
 
-To enable this support in the MCP C# SDK, the server must provide the SDK with an `ISseEventStreamStore` implementation
-to store SSE events that can be retrieved and sent to clients that reconnect to resume a stream.
-`ISseEventStreamStore` is a new interface in the MCP C# SDK that defines two methods:
-
-- `CreateStreamAsync`: Returns a writer for storing SSE events for a given request ID.
-- `GetStreamReaderAsync`: Returns a reader for retrieving SSE events for a given request ID,
-  starting from a specified event ID.
-
-There is an implementation of `ISseEventStreamStore` in development that uses a distributed cache for
-scenarios where the MCP server is running in a distributed environment.
-
-The best part of this feature is that it requires minimal changes to existing MCP servers using the C# SDK,
+In the MCP C# SDK, support has been added for servers to store and manage SSE event streams for MCP requests,
+and for clients to resume streams from a given event ID.
+The feature is designed so that it requires minimal changes to existing MCP servers using the C# SDK,
 and MCP clients/hosts using the C# SDK only need to update to the latest version of the SDK.
 
 Note that resumability of streams implicitly requires the server to maintain state for a request that
 may be used in future requests, so this feature is not compatible with stateless MCP servers.
-
 
 ### Server support for long-running requests with polling
 
 To enable long-running requests with polling in an MCP server using the C# SDK,
 the server must provide an `ISseEventStreamStore` implementation in the `HttpTransportOptions.EventStreamStore`
 when adding the `McpServer` to the servers Services collection.
+The SDK provides a `DistributedCacheEventStreamStore` implementation of `ISseEventStreamStore` which should be suitable for most scenarios,
+but servers can also implement their own `ISseEventStreamStore` if they have specific needs.
+
+The `DistributedCacheEventStreamStore` uses an `IDistributedCache` to store events for SSE streams.
+Two implementations of `IDistributedCache` are provided in the `Microsoft.Extensions.Caching` package:
+`MemoryDistributedCache` for in-memory caching and `RedisDistributedCache` for Redis-based caching.
 
 ```csharp
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(
-        options => options.EventStreamStore = new SimpleSseEventStreamStore()
+        options => options.EventStreamStore = new DistributedCacheEventStreamStore(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())))
     )
     .WithTools<RandomNumberTools>();
 ```
@@ -754,7 +751,7 @@ If the server wants to drop the SSE connection for a request before sending the 
 it can use the new `EnablePollingAsync` method of `McpRequestContext`.
 The `McpRequestContext` is available in handlers for MCP requests by simply adding it as a parameter to the handler method.
 The handler can call `EnablePollingAsync` at any point before sending the final response,
-and can include an optional `retryAfter` parameter to indicate how long the client should wait
+and can include an optional `retryInterval` parameter to indicate how long the client should wait
 before attempting to resume the stream.
 
 The following code snippet shows an example of enabling polling in a long-running request handler.
@@ -772,10 +769,17 @@ Some strategies to consider include:
 
 - Deleting streams for terminated sessions. In the HTTP Transport, the client can terminate a session by sending a
 DELETE request to the MCP endpoint with the `Mcp-Session-Id` header set to the session ID to terminate.
-The server detect session termination with a `RunSessionHandler`, which is specified in the `HttpTransportOptions`.
+The server can detect session termination with a `RunSessionHandler`, which is specified in the `HttpTransportOptions`,
+and delete any associated streams when a session is terminated.
 
 - Deleting streams after a certain time period. The server can implement logic to delete streams
-after they have been inactive for a certain time period.
+  after they have been inactive for a certain time period.
+  The `DistributedCacheEventStreamStore` supports configurable cache timeouts via `DistributedCacheEventStreamStoreOptions`:
+
+  - `EventSlidingExpiration` and `EventAbsoluteExpiration` for individual events
+  - `MetadataSlidingExpiration` and `MetadataAbsoluteExpiration` for stream metadata
+
+  These timeouts are configurable and should be tuned for your resumability window and memory constraints.
 
 - Selectively storing events. The server can implement logic to store only certain events, and discard others.
 For example, the server could choose to discard progress notification events, and only store final result events.

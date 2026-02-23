@@ -13,10 +13,21 @@ public sealed class SessionTrackingEventStreamStore : ISseEventStreamStore
     private readonly IDistributedCache _cache;
     private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _sessionStreams = new();
 
+    private static readonly DistributedCacheEventStreamStoreOptions DefaultOptions = new()
+    {
+        // Timeouts for individual SSE events in the cache
+        EventSlidingExpiration = TimeSpan.FromMinutes(5),
+        EventAbsoluteExpiration = TimeSpan.FromMinutes(30),
+
+        // Timeouts for per-stream metadata (typically longer than event entries)
+        MetadataSlidingExpiration = TimeSpan.FromMinutes(30),
+        MetadataAbsoluteExpiration = TimeSpan.FromHours(2),
+    };
+
     public SessionTrackingEventStreamStore(IDistributedCache cache, DistributedCacheEventStreamStoreOptions? options = null)
     {
         _cache = cache;
-        _innerStore = new DistributedCacheEventStreamStore(cache, options);
+        _innerStore = new DistributedCacheEventStreamStore(cache, options ?? DefaultOptions);
     }
 
     public ValueTask<ISseEventStreamWriter> CreateStreamAsync(SseEventStreamOptions options, CancellationToken cancellationToken = default)
