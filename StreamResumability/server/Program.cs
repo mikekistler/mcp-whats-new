@@ -1,22 +1,25 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Create a distributed cache and event stream store so we can reference it in the session handler
-var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
-var eventStreamStore = new SessionTrackingEventStreamStore(cache);
+// Register the event stream store as a singleton, and also add a distributed cache for it to use.
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSingleton<SessionTrackingEventStreamStore>();
+builder.Services.AddSingleton<ISseEventStreamStore>(sp => sp.GetRequiredService<SessionTrackingEventStreamStore>());
 
 // Add the MCP services: the transport to use (http) and the tools to register.
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(options =>
     {
-        options.EventStreamStore = eventStreamStore;
         // Use RunSessionHandler to clean up streams when a session ends
         options.RunSessionHandler = async (httpContext, mcpServer, cancellationToken) =>
         {
+            // Grab the event stream store from DI to use for cleanup when the session ends
+            var eventStreamStore = httpContext.RequestServices.GetRequiredService<SessionTrackingEventStreamStore>();
             try
             {
                 await mcpServer.RunAsync(cancellationToken);
@@ -26,7 +29,7 @@ builder.Services
                 // Delete all streams associated with this session when it ends
                 if (!string.IsNullOrEmpty(mcpServer.SessionId))
                 {
-                    await eventStreamStore.DeleteStreamsForSessionAsync(mcpServer.SessionId);
+                    await eventStreamStore.DeleteStreamsForSessionAsync(mcpServer.SessionId, cancellationToken);
                 }
             }
         };

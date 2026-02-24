@@ -38,17 +38,15 @@ await using var mcpClient = await McpClient.CreateAsync(clientTransport, options
 var tools = await mcpClient.ListToolsAsync();
 Console.WriteLine($"Connected to server with tools: {string.Join(", ", tools.Select(t => t.Name))}");
 
-// Set delay if specified
-if (delayInSeconds > 0 || retryIntervalInSeconds > 0)
+// Set delay
+
+Console.WriteLine($"Setting delay to {delayInSeconds} seconds and retry interval to {retryIntervalInSeconds} seconds");
+var setDelayArgs = new Dictionary<string, object?>
 {
-    Console.WriteLine($"Setting delay to {delayInSeconds} seconds and retry interval to {retryIntervalInSeconds} seconds");
-    var setDelayArgs = new Dictionary<string, object?>
-    {
-        { "delayInSeconds", delayInSeconds },
-        { "retryIntervalInSeconds", retryIntervalInSeconds }
-    };
-    await mcpClient.CallToolAsync(toolName: "set_delay", arguments: setDelayArgs);
-}
+    { "delayInSeconds", delayInSeconds },
+    { "retryIntervalInSeconds", retryIntervalInSeconds }
+};
+await mcpClient.CallToolAsync(toolName: "set_delay", arguments: setDelayArgs);
 
 // Call the get_random_number tool and print the result and duration of the call
 

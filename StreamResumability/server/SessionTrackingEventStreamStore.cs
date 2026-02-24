@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
 // Wraps DistributedCacheEventStreamStore to add session-level stream cleanup.
@@ -24,10 +25,15 @@ public sealed class SessionTrackingEventStreamStore : ISseEventStreamStore
         MetadataAbsoluteExpiration = TimeSpan.FromHours(2),
     };
 
-    public SessionTrackingEventStreamStore(IDistributedCache cache, DistributedCacheEventStreamStoreOptions? options = null)
+    public SessionTrackingEventStreamStore(
+        IDistributedCache cache,
+        DistributedCacheEventStreamStoreOptions? options = null)
     {
         _cache = cache;
-        _innerStore = new DistributedCacheEventStreamStore(cache, options ?? DefaultOptions);
+        var storeOptions = options ?? DefaultOptions;
+
+        storeOptions.Cache = cache;
+        _innerStore = new DistributedCacheEventStreamStore(Options.Create(storeOptions));
     }
 
     public ValueTask<ISseEventStreamWriter> CreateStreamAsync(SseEventStreamOptions options, CancellationToken cancellationToken = default)

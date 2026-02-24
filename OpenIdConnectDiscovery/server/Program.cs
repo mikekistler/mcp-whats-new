@@ -59,8 +59,8 @@ builder.Services.AddAuthentication(options =>
 {
     options.ResourceMetadata = new ()
     {
-        ResourceDocumentation = new Uri("https://docs.example.com/api/weather"),
-        AuthorizationServers = { new Uri($"{instance}{tenantId}/v2.0") },
+        ResourceDocumentation = "https://docs.example.com/api/weather",
+        AuthorizationServers = { $"{instance}{tenantId}/v2.0" },
         ScopesSupported = ["mcp:tools"],
     };
 });
