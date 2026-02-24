@@ -4,16 +4,15 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Create a distributed cache and event stream store so we can reference it in the session handler
-var cache = new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions()));
-var eventStreamStore = new SessionTrackingEventStreamStore(cache);
+// Register the event stream store as a singleton, and also add a distributed cache for it to use.
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSingleton<SessionTrackingEventStreamStore>();
 
 // Add the MCP services: the transport to use (http) and the tools to register.
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(options =>
     {
-        options.EventStreamStore = eventStreamStore;
         // Use RunSessionHandler to clean up streams when a session ends
         options.RunSessionHandler = async (httpContext, mcpServer, cancellationToken) =>
         {
@@ -26,12 +25,14 @@ builder.Services
                 // Delete all streams associated with this session when it ends
                 if (!string.IsNullOrEmpty(mcpServer.SessionId))
                 {
+                    var eventStreamStore = httpContext.RequestServices.GetRequiredService<SessionTrackingEventStreamStore>();
                     await eventStreamStore.DeleteStreamsForSessionAsync(mcpServer.SessionId);
                 }
             }
         };
     })
-    .WithTools<RandomNumberTools>();
+    .WithTools<RandomNumberTools>()
+    .WithDistributedCacheEventStreamStore();
 
 var app = builder.Build();
 app.MapMcp();

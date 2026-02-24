@@ -249,7 +249,7 @@ To enable JWT bearer authentication, add the JWT bearer authentication handler t
 In the options, you can configure various parameters for validating JWTs, such as the authority, audience, and token validation parameters. The following token validation settings are strongly recommended:
 
 | Setting | Value | Description |
-|---------|-------|-------------|
+| --------- | ------- | ------------- |
 | `ValidateIssuer` | `true` | Ensures the token was issued by a trusted authority |
 | `ValidateAudience` | `true` | Verifies the token is intended for this server |
 | `ValidateLifetime` | `true` | Checks that the token has not expired |

@@ -31,8 +31,8 @@ public static class SamplingMessageExtensions
                 TextContentBlock textBlock => TruncateText(textBlock.Text, maxLength),
                 ToolUseContentBlock toolUseBlock => $"[ToolUse: {toolUseBlock.Name}, Id: {toolUseBlock.Id}]",
                 ToolResultContentBlock toolResultBlock => $"[ToolResult: {toolResultBlock.ToolUseId}]",
-                ImageContentBlock imageBlock => $"[Image: {FormatSize(imageBlock.Data?.Length ?? 0)}]",
-                AudioContentBlock audioBlock => $"[Audio: {FormatSize(audioBlock.Data?.Length ?? 0)}]",
+                ImageContentBlock imageBlock => $"[Image: {FormatSize(imageBlock.Data.Length)}]",
+                AudioContentBlock audioBlock => $"[Audio: {FormatSize(audioBlock.Data.Length)}]",
                 _ => $"[{block.GetType().Name}]"
             };
 
