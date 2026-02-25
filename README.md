@@ -4,7 +4,7 @@
 
 New features in MCP C# SDK for the [2025-11-25 version of the MCP Specification]:
 
-- [Enhance authorization server discovery with support for OpenID Connect Discovery 1.0](#enhance-authorization-server-discovery-with-support-for-openid-connect-discovery-100)
+- [Enhance authorization server discovery with support for OpenID Connect Discovery 1.0](#enhance-authorization-server-discovery-with-support-for-openid-connect-discovery-10)
 
 - [Icons for tools, resources, resource templates, and prompts](#icons-for-tools-resources-resource-templates-and-prompts)
 
@@ -22,9 +22,6 @@ New features in MCP C# SDK for the [2025-11-25 version of the MCP Specification]
 
 See the [Changelog] for the full list of changes.
 
-[2025-11-25 version of the MCP Specification]: https://github.com/modelcontextprotocol.io/specification/2025-11-25
-[Changelog]: https://github.com/modelcontextprotocol.io/specification/2025-11-25/changelog
-
 ## Enhance authorization server discovery with support for OpenID Connect Discovery 1.0
 
 - Spec change: [PR #797](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/797)
@@ -36,12 +33,13 @@ In the 2025-11-25 spec, the server can expose the PRM in any of three ways:
 
 1. Via a URL in the `resource_metadata` parameter of the WWW-Authenticate header (as before)
 2. At a "well known" URL
+    <!-- markdown-link-check-disable -->
     - At the path of the server’s MCP endpoint: https://example.com/public/mcp could host metadata at https://example.com/.well-known/oauth-protected-resource/public/mcp
     - At the root: https://example.com/.well-known/oauth-protected-resource
-
+    <!-- markdown-link-check-enable -->
 Clients check for the PRM in these locations in the order listed above.
 
-The MCP C# SDK provides the `AddMcp` extension method of `AuthenticationBuilder` for the server to specify the key fields
+The MCP C# SDK provides the [AddMcp][AddMcp] extension method of [AuthenticationBuilder][AuthenticationBuilder] for the server to specify the key fields
 for the PRM Document.
 
 ```csharp
@@ -74,7 +72,7 @@ This icon information is included in the response of a `tools/list`, `resources/
 The Implementation metadata, which describes either a client or a server, has also been extended to include icons and a website URL.
 The C# SDK has been updated to support these fields.
 
-The `IconSource` parameter of `McpServerToolAttribute` can be used to specify a single icon URL for a tool.
+The [IconSource][IconSource] parameter of [McpServerToolAttribute][McpServerToolAttribute] can be used to specify a single icon URL for a tool.
 An example usage is shown below.
 
 ```csharp
@@ -82,10 +80,10 @@ An example usage is shown below.
 public static string ToolWithIcon(
 ```
 
-The `McpServerResourceAttribute`, `McpServerResourceTemplateAttribute`, and `McpServerPromptAttribute` also have an `IconSource` parameter that can be used similarly to specify a single icon URL for resources, resource templates, and prompts, respectively.
+The [McpServerResourceAttribute][McpServerResourceAttribute], [McpServerResourceTemplateAttribute][McpServerResourceTemplateAttribute], and [McpServerPromptAttribute][McpServerPromptAttribute] also have an [IconSource][IconSource] parameter that can be used similarly to specify a single icon URL for resources, resource templates, and prompts, respectively.
 
 For more advanced icon configuration (multiple icons, MIME type specification, size characteristics),
-icons can be specified for a tool programmatically, for example using the `McpServerToolCreateOptions.Icons` property:
+icons can be specified for a tool programmatically, for example using the [McpServerToolCreateOptions.Icons][McpServerToolCreateOptions.Icons] property:
 
 ```csharp
     .WithTools([
@@ -125,11 +123,11 @@ icons can be specified for a tool programmatically, for example using the `McpSe
     ])
 ```
 
-The `McpServerResourceCreateOptions`, `McpServerResourceTemplateCreateOptions`, and `McpServerPromptCreateOptions` classes have similar `Icons` properties for specifying icons for resources, resource templates, and prompts, respectively.
+The [McpServerResourceCreateOptions][McpServerResourceCreateOptions], [McpServerResourceTemplateCreateOptions][McpServerResourceTemplateCreateOptions], and [McpServerPromptCreateOptions][McpServerPromptCreateOptions] classes have similar `Icons` properties for specifying icons for resources, resource templates, and prompts, respectively.
 
-Finally, the `Implementation` class also has an `Icons` property that can be used to specify icons,
+Finally, the [Implementation][Implementation] class also has an `Icons` property that can be used to specify icons,
 and it has a `Website` property to specify a website URL for the implementation metadata.
-These can be set in the `Implementation` object used in the server or client configuration:
+These can be set in the [Implementation][Implementation] object used in the server or client configuration:
 
 ```csharp
     .AddMcpServer(options =>
@@ -168,8 +166,6 @@ These can be set in the `Implementation` object used in the server or client con
 
 Another important feature of the 2025-11-25 version of the MCP Specification is support for incremental scope consent via the `WWW-Authenticate` header.
 This feature supports the [Principle of Least Privilege] by allowing clients to request only the minimum level of access needed to perform their tasks.
-
-[Principle of Least Privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
 
 MCP uses OAuth 2.0 for authorization, and in Oauth 2.0, _scopes_ define the level of access a client has to a resource.
 Clients request permissions to specific scopes during the authorization process.
@@ -255,13 +251,13 @@ In the options, you can configure various parameters for validating JWTs, such a
 | `ValidateLifetime` | `true` | Checks that the token has not expired |
 | `ValidateIssuerSigningKey` | `true` | Confirms the token signature is valid |
 
-You can also use the options to configure handlers for events such as `OnAuthenticationFailed` and `OnTokenValidated` to log authentication failures or perform additional validation.
+You can also use the options to configure handlers for events such as [OnAuthenticationFailed][OnAuthenticationFailed] and [OnTokenValidated][OnTokenValidated] to log authentication failures or perform additional validation.
 
 #### Specify authentication scheme metadata
 
 MCP Servers are required to provide metadata about their authentication scheme to guide clients on how to obtain access tokens
 in the form of a Protected Resource Metadata (PRM) Document.
-MCP Servers can specify this metadata using the `AddMcp` extension method of `AuthenticationBuilder`:
+MCP Servers can specify this metadata using the [AddMcp][AddMcp] extension method of [AuthenticationBuilder][AuthenticationBuilder]:
 
 ```csharp
     .AddMcp(options =>
@@ -343,8 +339,8 @@ Servers should implement fallback mechanisms to handle cases where the client do
 
 ### Client support for URL mode elicitation
 
-In the C# SDK, clients can indicate support for URL mode elicitation by setting the `Url` property of `Capabilities.Elicitation`
-in the `McpClientOptions` object used to construct the `McpClient`, as shown below:
+In the C# SDK, clients can indicate support for URL mode elicitation by setting the `Url` property of [Capabilities.Elicitation][Capabilities.Elicitation]
+in the [McpClientOptions][McpClientOptions] object used to construct the [McpClient][McpClient], as shown below:
 
 ```csharp
 McpClientOptions options = new()
@@ -359,8 +355,8 @@ McpClientOptions options = new()
     }
 ```
 
-As with form mode elicitation, the client must provide an `ElicitationHandler` in `McpClientOptions.Handlers`
-when constructing the `McpClient`.
+As with form mode elicitation, the client must provide an [ElicitationHandler][ElicitationHandler] in [McpClientOptions.Handlers][McpClientOptions.Handlers]
+when constructing the [McpClient][McpClient].
 
 ```csharp
 McpClientOptions options = new()
@@ -372,8 +368,8 @@ McpClientOptions options = new()
     }
 ```
 
-There is only one `ElicitationHandler` for both form mode and URL mode elicitation,
-so the handler should begin by checking the `Mode` property of the `ElicitationRequest` parameter
+There is only one [ElicitationHandler][ElicitationHandler] for both form mode and URL mode elicitation,
+so the handler should begin by checking the `Mode` property of the [ElicitationRequest][ElicitationRequest] parameter
 to determine which mode is being requested and handle it accordingly.
 
 ```csharp
@@ -481,8 +477,8 @@ The following sections describe how to use this support in MCP clients/hosts and
 
 Clients indicate that they support tool calling in sampling by setting the "sampling" property of its client capabilities,
 and within that, setting the "tools" property to an empty object.
-In the C# SDK, this is done in `Capabilities` property of `McpClientOptions` passed to the `CreateAsync` method of `McpClient`.
-Clients that declare support for sampling must also provide a `SamplingHandler` in the `Handlers` property of `McpClientOptions`.
+In the C# SDK, this is done in [Capabilities][Capabilities] property of [McpClientOptions][McpClientOptions] passed to the [CreateAsync][CreateAsync] method of [McpClient][McpClient].
+Clients that declare support for sampling must also provide a [SamplingHandler][SamplingHandler] in the [Handlers][Handlers] property of [McpClientOptions][McpClientOptions].
 This is illustrated in the code snippet below.
 
 ```csharp
@@ -512,15 +508,15 @@ var mcpClient = await McpClient.CreateAsync(
     });
 ```
 
-The `SamplingHandler` is invoked whenever the server sends a sampling request to the client.
+The [SamplingHandler][SamplingHandler] is invoked whenever the server sends a sampling request to the client.
 The handler must process the sampling request, including any tool invocation requests,
 and return the final sampling response to the server.
 
-The `SamplingHandler` could be a difficult piece of logic to implement, depending on the LLM being used.
+The [SamplingHandler][SamplingHandler] could be a difficult piece of logic to implement, depending on the LLM being used.
 Fortunately for clients written in C#, there is a sampling handler implementation provided by the
-`IChatClient` interface of the `Microsoft.Extensions.AI` package.
-You can obtain an `IChatClient` from an LLM chat client using the `AsIChatClient` extension method, as shown below.
-Then use the `CreateSamplingHandler` method of `IChatClient` to obtain a sampling handler that understands
+[IChatClient][IChatClient] interface of the `Microsoft.Extensions.AI` package.
+You can obtain an [IChatClient][IChatClient] from an LLM chat client using the [AsIChatClient][AsIChatClient] extension method, as shown below.
+Then use the [CreateSamplingHandler][CreateSamplingHandler] method of [IChatClient][IChatClient] to obtain a sampling handler that understands
 how to translate the LLM tool invocation format to and from MCP tool invocation messages.
 
 ```csharp
@@ -543,7 +539,7 @@ That's all that is needed on the client/host side to support tool calling in sam
 ### Server support for tool calling in sampling
 
 Servers can take advantage of the tool calling support in sampling if they are connected to a client/host
-that also supports this feature. The capabilities of the client are available in the `McpServer.ClientCapabilities` property.
+that also supports this feature. The capabilities of the client are available in the [McpServer.ClientCapabilities][McpServer.ClientCapabilities] property.
 The following code snippet shows how to check for support for tool calling in sampling.
 
 ```csharp
@@ -554,9 +550,9 @@ if (_mcpServer?.ClientCapabilities?.Sampling?.Tools is not {})
 }
 ```
 
-When a server wants to send a sampling request with tools to the client, it constructs a `CreateMessageRequestParams` object
-that includes the list of `Tool` objects to include in the request and sends this to client using the `SampleAsync` method of `McpServer`.
-This `Tool` structure is the same as the one used in standard MCP tool metadata,
+When a server wants to send a sampling request with tools to the client, it constructs a [CreateMessageRequestParams][CreateMessageRequestParams] object
+that includes the list of [Tool][Tool] objects to include in the request and sends this to client using the [SampleAsync][SampleAsync] method of [McpServer][McpServer].
+This [Tool][Tool] structure is the same as the one used in standard MCP tool metadata,
 containing a tool name, description, and parameters schema.
 The following code snippet shows a simple example of constructing a Tool object to be included in a sampling request.
 
@@ -570,7 +566,7 @@ Tool rollDieTool = new Tool()
 
 But tools included in sampling requests do not need to be implemented as standard MCP tools by the server,
 and typically are not. And they work a bit differently from standard MCP tools, in that the input to a sampling tool
-is a `ToolUseContentBlock` from the LLM, and the output is list of `ToolResultContentBlock` objects.
+is a [ToolUseContentBlock][ToolUseContentBlock] from the LLM, and the output is list of [ToolResultContentBlock][ToolResultContentBlock] objects.
 So the server must implement its own logic to process tool invocations, dispatching to the appropriate tool implementation based on the tool name.
 
 Unlike a sampling request without tools, the server must implement logic to handle tool invocation requests
@@ -596,12 +592,10 @@ again comes to the rescue with support for tool calling in sampling requests.
 
 #### Sampling with tool calling support in Microsoft.Extensions.AI
 
-As with the client/host side, the server side can also use an `IChatClient` from the `Microsoft.Extensions.AI` package
+As with the client/host side, the server side can also use an [IChatClient][IChatClient] from the `Microsoft.Extensions.AI` package
 to handle much of the complexity of tool calling in sampling requests. This starts with the [AsSamplingChatClient] method
-of `McpServer` that returns an `IChatClient` with support for sampling. This can be extended to support tool calling
-with `UseFunctionInvocation`. The following code snippet shows how to set this up.
-
-[AsSamplingChatClient]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServer.html#ModelContextProtocol_Server_McpServer_AsSamplingChatClient_System_Text_Json_JsonSerializerOptions_
+of [McpServer][McpServer] that returns an [IChatClient][IChatClient] with support for sampling. This can be extended to support tool calling
+with [UseFunctionInvocation][UseFunctionInvocation]. The following code snippet shows how to set this up.
 
 ```csharp
 IChatClient chatClient =
@@ -610,8 +604,8 @@ IChatClient chatClient =
     .Build();
 ```
 
-Tools can then be described as `AIFunctions`, created with `AIFunctionFactory.Create` and passed to the `IChatClient`
-in the `ChatOptions` of `GetResponse`. The whole sequence looks like this:
+Tools can then be described as [AIFunctions][AIFunctions], created with [AIFunctionFactory.Create][AIFunctionFactory.Create] and passed to the [IChatClient][IChatClient]
+in the [ChatOptions][ChatOptions] of [GetResponse][GetResponse]. The whole sequence looks like this:
 
 ```csharp
 AIFunction rollDieTool = AIFunctionFactory.Create(
@@ -634,7 +628,7 @@ var pointRollResponse = await chatClient.GetResponseAsync(
 );
 ```
 
-The `IChatClient` handles the details of sending sampling requests with tools to the client,
+The [IChatClient][IChatClient] handles the details of sending sampling requests with tools to the client,
 processing tool invocation requests in the sampling responses, executing the requested tools,
 and sending new sampling requests with the tool invocation requests and responses,
 including translating between MCP tool invocation messages and the LLM's tool invocation format.
@@ -662,8 +656,8 @@ The complete flow is shown in the [MCP Specification](https://modelcontextprotoc
 Currently just a few Authorization Servers support CIMD, but it is viewed as an easier and more flexible alternative to DCR,
 so it is expected that more Authorization Servers will add support for it over time.
 
-In the MCP C# SDK, clients can specify a CIMD URL in the `ClientMetadataDocumentUri` property of the `ClientOAuthOptions` object
-specified when constructing the `HttpClientTransport` for connecting to the MCP server:
+In the MCP C# SDK, clients can specify a CIMD URL in the `ClientMetadataDocumentUri` property of the [ClientOAuthOptions][ClientOAuthOptions] object
+specified when constructing the [HttpClientTransport][HttpClientTransport] for connecting to the MCP server:
 
 ```csharp
 const string ClientMetadataDocumentUrl = $"{ClientUrl}/client-metadata/cimd-client.json";
@@ -728,12 +722,12 @@ may be used in future requests, so this feature is not compatible with stateless
 ### Server support for long-running requests with polling
 
 To enable long-running requests with polling in an MCP server using the C# SDK,
-the server must provide an `ISseEventStreamStore` implementation in the `HttpTransportOptions.EventStreamStore`
-when adding the `McpServer` to the servers Services collection.
-The SDK provides a `DistributedCacheEventStreamStore` implementation of `ISseEventStreamStore` which should be suitable for most scenarios,
-but servers can also implement their own `ISseEventStreamStore` if they have specific needs.
+the server must provide an [ISseEventStreamStore][ISseEventStreamStore] implementation in the [HttpServerTransportOptions.EventStreamStore][HttpServerTransportOptions.EventStreamStore]
+when adding the [McpServer][McpServer] to the servers Services collection.
+The SDK provides a [DistributedCacheEventStreamStore][DistributedCacheEventStreamStore] implementation of [ISseEventStreamStore][ISseEventStreamStore] which should be suitable for most scenarios,
+but servers can also implement their own [ISseEventStreamStore][ISseEventStreamStore] if they have specific needs.
 
-The `DistributedCacheEventStreamStore` uses an `IDistributedCache` to store events for SSE streams.
+The [DistributedCacheEventStreamStore][DistributedCacheEventStreamStore] uses an `IDistributedCache` to store events for SSE streams.
 Two implementations of `IDistributedCache` are provided in the `Microsoft.Extensions.Caching` package:
 `MemoryDistributedCache` for in-memory caching and `RedisDistributedCache` for Redis-based caching.
 
@@ -749,9 +743,9 @@ builder.Services
 ```
 
 If the server wants to drop the SSE connection for a request before sending the final response,
-it can use the new `EnablePollingAsync` method of `McpRequestContext`.
-The `McpRequestContext` is available in handlers for MCP requests by simply adding it as a parameter to the handler method.
-The handler can call `EnablePollingAsync` at any point before sending the final response,
+it can use the new [EnablePollingAsync][EnablePollingAsync] method of [McpRequestContext][McpRequestContext].
+The [McpRequestContext][McpRequestContext] is available in handlers for MCP requests by simply adding it as a parameter to the handler method.
+The handler can call [EnablePollingAsync][EnablePollingAsync] at any point before sending the final response,
 and can include an optional `retryInterval` parameter to indicate how long the client should wait
 before attempting to resume the stream.
 
@@ -764,18 +758,18 @@ await context.EnablePollingAsync(retryInterval: TimeSpan.FromSeconds(retryInterv
 
 ### Important Implementation notes
 
-As mentioned above, a naive implementation of `ISseEventStreamStore` could be susceptible to unbounded memory growth,
+As mentioned above, a naive implementation of [ISseEventStreamStore][ISseEventStreamStore] could be susceptible to unbounded memory growth,
 so care should be taken to implement appropriate retention policies.
 Some strategies to consider include:
 
 - Deleting streams for terminated sessions. In the HTTP Transport, the client can terminate a session by sending a
 DELETE request to the MCP endpoint with the `Mcp-Session-Id` header set to the session ID to terminate.
-The server can detect session termination with a `RunSessionHandler`, which is specified in the `HttpTransportOptions`,
+The server can detect session termination with a [RunSessionHandler][RunSessionHandler], which is specified in the [HttpServerTransportOptions][HttpServerTransportOptions],
 and delete any associated streams when a session is terminated.
 
 - Deleting streams after a certain time period. The server can implement logic to delete streams
   after they have been inactive for a certain time period.
-  The `DistributedCacheEventStreamStore` supports configurable cache timeouts via `DistributedCacheEventStreamStoreOptions`:
+    The [DistributedCacheEventStreamStore][DistributedCacheEventStreamStore] supports configurable cache timeouts via [DistributedCacheEventStreamStoreOptions][DistributedCacheEventStreamStoreOptions]:
 
   - `EventSlidingExpiration` and `EventAbsoluteExpiration` for individual events
   - `MetadataSlidingExpiration` and `MetadataAbsoluteExpiration` for stream metadata
@@ -789,3 +783,57 @@ For example, the server could choose to discard progress notification events, an
 
 - SEP: [SEP-1686](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1686)
 - SDK change: In progress
+
+[2025-11-25 version of the MCP Specification]: https://modelcontextprotocol.io/specification/2025-11-25
+[AddMcp]: https://modelcontextprotocol.github.io/csharp-sdk/api/Microsoft.Extensions.DependencyInjection.McpAuthenticationExtensions.html?q=AddMcp#Microsoft_Extensions_DependencyInjection_McpAuthenticationExtensions_AddMcp_Microsoft_AspNetCore_Authentication_AuthenticationBuilder_System_Action_ModelContextProtocol_AspNetCore_Authentication_McpAuthenticationOptions__
+[AIFunctionFactory.Create]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[AIFunctions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[AsIChatClient]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[AsSamplingChatClient]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServer.html#ModelContextProtocol_Server_McpServer_AsSamplingChatClient_System_Text_Json_JsonSerializerOptions_
+[AuthenticationBuilder]: https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.authentication.authenticationbuilder
+[Capabilities]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientOptions.html#ModelContextProtocol_Client_McpClientOptions_Capabilities
+[Capabilities.Elicitation]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.ClientCapabilities.html#ModelContextProtocol_Protocol_ClientCapabilities_Elicitation
+[Changelog]: https://modelcontextprotocol.io/specification/2025-11-25/changelog
+[ChatOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[ClientOAuthOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Authentication.ClientOAuthOptions.html
+[CreateAsync]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClient.html#ModelContextProtocol_Client_McpClient_CreateAsync_ModelContextProtocol_Client_IClientTransport_ModelContextProtocol_Client_McpClientOptions_Microsoft_Extensions_Logging_ILoggerFactory_System_Threading_CancellationToken_
+[CreateMessageRequestParams]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.CreateMessageRequestParams.html
+[CreateSamplingHandler]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html#ModelContextProtocol_AIContentExtensions_CreateSamplingHandler_Microsoft_Extensions_AI_IChatClient_System_Text_Json_JsonSerializerOptions_
+[DistributedCacheEventStreamStore]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.DistributedCacheEventStreamStore.html
+[DistributedCacheEventStreamStoreOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.DistributedCacheEventStreamStoreOptions.html
+[ElicitationHandler]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientHandlers.html#ModelContextProtocol_Client_McpClientHandlers_ElicitationHandler
+[ElicitationRequest]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.ElicitRequestParams.html
+[EnablePollingAsync]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.RequestContext-1.html#ModelContextProtocol_Server_RequestContext_1_EnablePollingAsync_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_
+[GetResponse]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[Handlers]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientOptions.html#ModelContextProtocol_Client_McpClientOptions_Handlers
+[HttpClientTransport]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.HttpClientTransport.html
+[HttpServerTransportOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AspNetCore.HttpServerTransportOptions.html
+[HttpServerTransportOptions.EventStreamStore]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AspNetCore.HttpServerTransportOptions.html?q=EventStreamStore#ModelContextProtocol_AspNetCore_HttpServerTransportOptions_EventStreamStore
+[IChatClient]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
+[IconSource]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolAttribute.html#ModelContextProtocol_Server_McpServerToolAttribute_IconSource
+[Implementation]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.Implementation.html
+[ISseEventStreamStore]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.ISseEventStreamStore.html
+[McpClient]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClient.html
+[McpClientOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientOptions.html
+[McpClientOptions.Handlers]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientOptions.html#ModelContextProtocol_Client_McpClientOptions_Handlers
+[McpRequestContext]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.RequestContext-1.html
+[McpServer]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServer.html
+[McpServer.ClientCapabilities]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServer.html#ModelContextProtocol_Server_McpServer_ClientCapabilities
+[McpServerPromptAttribute]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerPromptAttribute.html
+[McpServerPromptCreateOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerPromptCreateOptions.html
+[McpServerResourceAttribute]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerResourceAttribute.html
+[McpServerResourceCreateOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerResourceCreateOptions.html
+[McpServerResourceTemplateAttribute]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerResourceTypeAttribute.html
+[McpServerResourceTemplateCreateOptions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerResourceCreateOptions.html
+[McpServerToolAttribute]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolAttribute.html
+[McpServerToolCreateOptions.Icons]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServerToolCreateOptions.html#ModelContextProtocol_Server_McpServerToolCreateOptions_Icons
+[OnAuthenticationFailed]: https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.authentication.jwtbearer.jwtbearerevents.onauthenticationfailed
+[OnTokenValidated]: https://learn.microsoft.com/dotnet/api/microsoft.aspnetcore.authentication.jwtbearer.jwtbearerevents.ontokenvalidated
+[Principle of Least Privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
+[RunSessionHandler]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AspNetCore.HttpServerTransportOptions.html?q=RunSessionHandler#ModelContextProtocol_AspNetCore_HttpServerTransportOptions_RunSessionHandler
+[SampleAsync]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Server.McpServer.html#ModelContextProtocol_Server_McpServer_SampleAsync_ModelContextProtocol_Protocol_CreateMessageRequestParams_System_Threading_CancellationToken_
+[SamplingHandler]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Client.McpClientHandlers.html#ModelContextProtocol_Client_McpClientHandlers_SamplingHandler
+[Tool]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.Tool.html
+[ToolResultContentBlock]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.ToolResultContentBlock.html
+[ToolUseContentBlock]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.Protocol.ToolUseContentBlock.html
+[UseFunctionInvocation]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html

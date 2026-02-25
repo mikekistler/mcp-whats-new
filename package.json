@@ -1,0 +1,7 @@
+{
+  "name": "mcp-whats-new",
+  "private": true,
+  "scripts": {
+    "check:links": "npx -y markdown-link-check README.md"
+  }
+}
