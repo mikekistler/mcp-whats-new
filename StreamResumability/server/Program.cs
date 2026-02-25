@@ -16,6 +16,7 @@ builder.Services
     .WithHttpTransport(options =>
     {
         // Use RunSessionHandler to clean up streams when a session ends
+#pragma warning disable MCPEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         options.RunSessionHandler = async (httpContext, mcpServer, cancellationToken) =>
         {
             // Grab the event stream store from DI to use for cleanup when the session ends
@@ -33,6 +34,7 @@ builder.Services
                 }
             }
         };
+#pragma warning restore MCPEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     })
     .WithTools<RandomNumberTools>();
 
