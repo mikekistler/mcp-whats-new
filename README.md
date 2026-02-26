@@ -185,10 +185,10 @@ Clients should request authorization for only these scopes in order to perform t
 - **Communicating additional scopes**: When a client makes a request with an `Authorization` header but lacks the necessary scopes for the requested operation, the server responds with a `403 Forbidden` status code. The response should include a `WWW-Authenticate` header with
 
   - an `error` parameter indicating `insufficient_scope`, and
-  - a `scopes` parameter that lists the additional scopes required.
+  - a `scopes` parameter that lists the scopes required to perform the operation.
 
-  Clients will typically request a new access token with the scopes specified in the `scopes` parameter and then retry the operation.
-  Clients then typically continue using this new access token for subsequent requests until it expires or they encounter another `403 Forbidden` response.
+Clients will typically request a new access token with the scopes specified in the `scopes` parameter and then retry the operation.
+Clients then typically continue using this new access token for subsequent requests until it expires or they encounter another `403 Forbidden` response.
 
 Note that both the client and server must support these practices for incremental scope consent to work effectively.
 Here's how the C# SDK helps accomplish this.
@@ -277,11 +277,25 @@ After authentication is set up, the MCP server and underlying framework will aut
 However, the server must also perform authorization checks to ensure the authenticated client has the necessary scopes
 to perform the requested operation.
 
-The first step in authorization is to determine the scopes included in the access token passed in the request.
+In practice, this authorization check should be implemented in ASP.NET Core middleware instead of inside the tool method itself. This is because the MCP HTTP handler may (and in practice does) flush response headers before invoking the tool.
+By the time the tool call method is invoked, it is too late to set the response status code or headers.
+
+Unfortunately, the middleware may need to inspect the contents of the request to determine which scopes are required, which involves an extra deserialization for incoming requests. But help may be on the way in future versions of the MCP protocol that will avoid this overhead in most cases. Stay tuned...
+
+In addition to inspecting the request, the middleware must also extract the scopes from the access token sent in the request.
 In the MCP C# SDK, the authentication handler extracts the scopes from the JWT and converts them to claims in the `HttpContext.User` property.
-However, the way these claims are represented depends on the token issuer and the JWT structure.
+The way these claims are represented depends on the token issuer and the JWT structure.
 For a token issuer that represents scopes as a space-separated string in the `scope` claim,
 you can determine the scopes passed in the request as follows:
+
+
+By intercepting the `tools/call` JSON-RPC request in middleware (before MCP dispatches to tools), a server can safely:
+
+- Inspect which tool is being called
+- Extract scopes from `HttpContext.User` claims (`scope` / `scp`)
+- Reject with `403 Forbidden` and `WWW-Authenticate: Bearer error="insufficient_scope", scope="..."` when needed
+
+The following pattern enforces a required scope for a protected tool call:
 
 ```csharp
     var user = context.User;
@@ -289,29 +303,18 @@ you can determine the scopes passed in the request as follows:
             .Where(c => c.Type == "scope" || c.Type == "scp")
             .SelectMany(c => c.Value.Split(' '))
             .Distinct()
-            .ToList() ?? new List<string>();
+            .ToList();
 ```
 
 With the scopes extracted from the request, the server can then check if the required scope(s) for the requested operation is included with `userScopes.Contains(requiredScope)`.
 
 If the required scope(s) are present, the server can proceed with processing the request. If not, the server should respond with a `403 Forbidden` status code and include a `WWW-Authenticate` header, including an `error` parameter indicating `insufficient_scope` and a `scopes` parameter indicating the scopes required.
+
 It is important to carefully consider which scopes to include in the `scopes` parameter. There are several strategies to choose from, as described in the [MCP Specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#runtime-insufficient-scope-errors):
 
 - **Minimum approach**: Include the newly-required scopes for the specific operation. Include any existing granted scopes as well, if they are required, to prevent clients from losing previously granted permissions.
 - **Recommended approach**: Include both existing relevant scopes and newly required scopes to prevent clients from losing previously granted permissions
 - **Extended approach**: Include existing scopes, newly required scopes, and related scopes that commonly work together
-
-To generate the `403 Forbidden` response with the `WWW-Authenticate` header, using the recommended approach for scopes,
-you can use the following code snippet:
-
-```csharp
-    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-    var wwwAuthenticateHeader = new StringBuilder("Bearer ");
-    wwwAuthenticateHeader.Append("error=\"insufficient_scope\"");
-    wwwAuthenticateHeader.Append($", scopes=\"{string.Join(' ', requiredScopes)}\"");
-    context.Response.Headers.Append("WWW-Authenticate", wwwAuthenticateHeader.ToString());
-    await context.Response.CompleteAsync();
-```
 
 ## Support for URL mode elicitation
 
