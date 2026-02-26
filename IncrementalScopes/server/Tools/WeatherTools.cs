@@ -10,12 +10,10 @@ namespace ProtectedMcpServer.Tools;
 public sealed class WeatherTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public WeatherTools(IHttpClientFactory httpClientFactory, IHttpContextAccessor httpContextAccessor)
+    public WeatherTools(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
-        _httpContextAccessor = httpContextAccessor;
     }
 
     [McpServerTool, Description("Get weather alerts for a US state.")]
@@ -74,33 +72,6 @@ public sealed class WeatherTools
     public async Task<string> MakeItRain(
         [Description("State where it should rain.")] string state)
     {
-        var context = _httpContextAccessor.HttpContext;
-        if (context == null)
-        {
-            throw new McpException("No HTTP context available");
-        }
-
-        var user = context.User;
-        var userScopes = user?.Claims
-                .Where(c => c.Type == "scope" || c.Type == "scp")
-                .SelectMany(c => c.Value.Split(' '))
-                .Distinct()
-                .ToList() ?? new List<string>();
-        var hasScope = userScopes.Contains("rain:god");
-
-        if (!hasScope)
-        {
-            // Servers have flexibility in determining which scopes to include. The recommended approach is to include
-            // both existing relevant scopes and newly required scopes to prevent clients from losing previously granted permissions
-            context.Response.StatusCode = 403;
-
-            // Add newly required scope to the existing user scopes
-            userScopes.Add("rain:god");
-            context.Response.Headers.WWWAuthenticate = $"Bearer error=\"insufficient_scope\", scope=\"{string.Join(" ", userScopes)}\"";
-            throw new McpException("Insufficient scope",
-                new UnauthorizedAccessException("Required scope: rain:god"));
-        }
-
         await Task.Delay(500); // Simulate some work
         return $"It's now raining in {state}! ☔️";
     }

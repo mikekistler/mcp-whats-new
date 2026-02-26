@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using ModelContextProtocol;
 using ModelContextProtocol.AspNetCore.Authentication;
+using ModelContextProtocol.Protocol;
+using ProtectedMcpServer.Middleware;
 using ProtectedMcpServer.Tools;
 using System.Net.Http.Headers;
 using System.Security.Claims;
@@ -82,6 +85,11 @@ var app = builder.Build();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Add middleware to intercept tools/call requests for MakeItRain and check for the "rain:god" scope.
+// This must be done in middleware because the MCP handler flushes response headers before invoking tools,
+// so setting the status code inside the tool method would cause an InvalidOperationException.
+app.UseMiddleware<CheckScopesMiddleware>();
 
 // Use the default MCP policy name that we've configured
 app.MapMcp().RequireAuthorization();
