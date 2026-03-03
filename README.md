@@ -869,6 +869,22 @@ You can explicitly control task support on individual tools using the `ToolTaskS
 - `Optional` (default for async methods): Tool can be called with or without task augmentation
 - `Required`: Tool must be called with task augmentation
 
+Set `TaskSupport` on the `[McpServerTool]` attribute:
+
+```csharp
+[McpServerTool(TaskSupport = ToolTaskSupport.Required)]
+[Description("Processes a batch of data records. Always runs as a task.")]
+public static async Task<string> ProcessData(
+    [Description("Number of records to process")] int recordCount,
+    CancellationToken cancellationToken)
+{
+    await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken);
+    return $"Processed {recordCount} records successfully.";
+}
+```
+
+Or set it via `McpServerToolCreateOptions.Execution` when registering tools explicitly:
+
 ```csharp
 builder.Services.AddMcpServer()
     .WithTools([
@@ -886,62 +902,9 @@ builder.Services.AddMcpServer()
 ```
 
 For more control over the task lifecycle, a tool can directly interact with [IMcpTaskStore][IMcpTaskStore] and return an `McpTask`.
-This bypasses automatic task wrapping and allows the tool to create a task, schedule background work, and return immediately:
-
-```csharp
-[McpServerToolType]
-public class MyTools(IMcpTaskStore taskStore)
-{
-    [McpServerTool]
-    [Description("Starts a background job and returns a task for polling.")]
-    public async Task<McpTask> StartBackgroundJob(
-        [Description("Number of items to process")] int itemCount,
-        RequestContext<CallToolRequestParams> context,
-        CancellationToken cancellationToken)
-    {
-        // Create a task in the store
-        var task = await taskStore.CreateTaskAsync(
-            new McpTaskMetadata { TimeToLive = TimeSpan.FromMinutes(30) },
-            context.JsonRpcRequest.Id!,
-            context.JsonRpcRequest,
-            context.Server.SessionId,
-            cancellationToken);
-
-        // Schedule work to run in the background
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(10));
-                var result = $"Processed {itemCount} items successfully";
-
-                await taskStore.StoreTaskResultAsync(
-                    task.TaskId,
-                    McpTaskStatus.Completed,
-                    JsonSerializer.SerializeToElement(new CallToolResult
-                    {
-                        Content = [new TextContentBlock { Text = result }]
-                    }),
-                    context.Server.SessionId);
-            }
-            catch (Exception ex)
-            {
-                await taskStore.StoreTaskResultAsync(
-                    task.TaskId,
-                    McpTaskStatus.Failed,
-                    JsonSerializer.SerializeToElement(new CallToolResult
-                    {
-                        Content = [new TextContentBlock { Text = ex.Message }],
-                        IsError = true
-                    }),
-                    context.Server.SessionId);
-            }
-        }, CancellationToken.None);
-
-        return task;
-    }
-}
-```
+This bypasses automatic task wrapping and allows the tool to create a task, schedule background work, and return immediately.
+Note: use a **static** method and accept `IMcpTaskStore` as a **method parameter** rather than via constructor injection
+to avoid DI scope issues when the SDK executes the tool in a background context.
 
 ### Client support
 

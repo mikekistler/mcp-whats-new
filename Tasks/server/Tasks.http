@@ -1,20 +1,119 @@
-# For more info on HTTP files go to https://aka.ms/vs/httpfile
-
 @HostAddress = http://localhost:6174
+
+### Initialize request
+
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+
+{
+    "jsonrpc": "2.0",
+    "id": 0,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "clientInfo": {
+            "name": "TasksClient",
+            "version": "1.0.0"
+        }
+    }
+}
+
+### Tools List request
+
+@SessionId =
 
 POST {{HostAddress}}/
 Accept: application/json, text/event-stream
 Content-Type: application/json
 MCP-Protocol-Version: 2025-11-25
+Mcp-Session-Id: {{SessionId}}
 
 {
     "jsonrpc": "2.0",
     "id": 1,
+    "method": "tools/list",
+    "params": {}
+}
+
+###
+
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+MCP-Session-Id: {{SessionId}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 2,
     "method": "tools/call",
     "params": {
         "name": "generate_report",
         "arguments": {
             "topic": "climate change"
+        },
+        "task": {
+            "ttl": 600000
+        }
+    }
+}
+
+### Task Get request
+
+@TaskId =
+
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+MCP-Session-Id: {{SessionId}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tasks/get",
+    "params": {
+        "taskId": "{{TaskId}}"
+    }
+}
+
+### Task results request
+
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+MCP-Session-Id: {{SessionId}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "tasks/result",
+    "params": {
+        "taskId": "{{TaskId}}"
+    }
+}
+
+###
+
+# Attempt to call a tool that requires a task
+
+POST {{HostAddress}}/
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-11-25
+MCP-Session-Id: {{SessionId}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+        "name": "process_data",
+        "arguments": {
+            "recordCount": 100
         }
     }
 }
