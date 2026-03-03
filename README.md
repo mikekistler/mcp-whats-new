@@ -785,9 +785,246 @@ For example, the server could choose to discard progress notification events, an
 ## An experimental tasks feature for durable requests with polling and deferred result retrieval
 
 - SEP: [SEP-1686](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1686)
-- SDK change: In progress
+- Spec change: [PR #1732](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1732)
+- SDK change: [PR #1170](https://github.com/modelcontextprotocol/csharp-sdk/pull/1170)
+
+> **Note**: Tasks are an experimental feature in the 2025-11-25 MCP Specification. The API may change in future releases.
+
+The 2025-11-25 version of the MCP Specification introduces _tasks_, a new primitive that provides durable state tracking
+and deferred result retrieval for MCP requests. While [stream resumability](#support-for-long-running-requests-over-http-with-polling)
+handles transport-level concerns like reconnection and event replay, tasks operate at the data layer to ensure
+that request results are durably stored and can be retrieved at any point within a server-defined retention window —
+even if the original connection is long gone.
+
+The key concept is that tasks _augment_ existing requests rather than replacing them.
+A client includes a `task` field in a request (e.g. `tools/call`) to signal that it wants durable result tracking.
+Instead of the normal response, the server returns a `CreateTaskResult` containing task metadata — a unique task ID, the current status (`working`),
+timestamps, a time-to-live (TTL), and optionally a suggested poll interval.
+The client then uses `tasks/get` to poll for status, `tasks/result` to retrieve the stored result,
+`tasks/list` to enumerate tasks, and `tasks/cancel` to cancel a running task.
+
+This durability is valuable in several scenarios:
+
+- **Resilience to dropped results**: If a result is lost due to a network failure, the client can retrieve it again by task ID
+  rather than re-executing the operation.
+- **Explicit status tracking**: Clients can query the server to determine whether a request is still in progress, succeeded, or failed,
+  rather than relying on notifications or waiting indefinitely.
+- **Integration with workflow systems**: MCP servers wrapping existing workflow APIs (e.g. CI/CD pipelines, batch processing, multi-step analysis)
+  can map their existing job tracking directly to the task primitive.
+
+Tasks follow a defined lifecycle through these status values:
+
+| Status | Description |
+|--------|-------------|
+| `working` | Task is actively being processed |
+| `input_required` | Task is waiting for additional input (e.g., elicitation) |
+| `completed` | Task finished successfully; results are available |
+| `failed` | Task encountered an error |
+| `cancelled` | Task was cancelled by the client |
+
+The last three states (`completed`, `failed`, and `cancelled`) are terminal — once a task reaches one of these states, it cannot transition to any other state.
+
+Task support is negotiated through explicit capability declarations during initialization.
+Servers declare that they support task-augmented `tools/call` requests, while clients can declare support for
+task-augmented `sampling/createMessage` and `elicitation/create` requests.
+
+### Server support
+
+To enable task support on an MCP server, configure a task store when setting up the server.
+The task store is responsible for managing task state — creating tasks, storing results, and handling cleanup.
+
+```csharp
+var taskStore = new InMemoryMcpTaskStore();
+
+builder.Services.AddMcpServer(options =>
+{
+    options.TaskStore = taskStore;
+})
+.WithHttpTransport()
+.WithTools<MyTools>();
+```
+
+The [InMemoryMcpTaskStore][InMemoryMcpTaskStore] is a reference implementation suitable for development and single-server deployments.
+For production multi-server scenarios, implement [IMcpTaskStore][IMcpTaskStore] with a persistent backing store (database, Redis, etc.).
+
+The `InMemoryMcpTaskStore` constructor accepts several optional parameters to control task retention, polling behavior,
+and resource limits:
+
+```csharp
+var taskStore = new InMemoryMcpTaskStore(
+    defaultTtl: TimeSpan.FromHours(1),        // Default task retention time
+    maxTtl: TimeSpan.FromHours(24),           // Maximum allowed TTL
+    pollInterval: TimeSpan.FromSeconds(1),    // Suggested client poll interval
+    cleanupInterval: TimeSpan.FromMinutes(5), // Background cleanup frequency
+    pageSize: 100,                            // Tasks per page for listing
+    maxTasks: 1000,                           // Maximum total tasks allowed
+    maxTasksPerSession: 100                   // Maximum tasks per session
+);
+```
+
+Tools automatically advertise task support when they return `Task`, `ValueTask`, `Task<T>`, or `ValueTask<T>` (i.e. async methods).
+You can explicitly control task support on individual tools using the `ToolTaskSupport` enum:
+
+- `Forbidden` (default for sync methods): Tool cannot be called with task augmentation
+- `Optional` (default for async methods): Tool can be called with or without task augmentation
+- `Required`: Tool must be called with task augmentation
+
+```csharp
+builder.Services.AddMcpServer()
+    .WithTools([
+        McpServerTool.Create(
+            (int count, CancellationToken ct) => ProcessAsync(count, ct),
+            new McpServerToolCreateOptions
+            {
+                Name = "requiredTaskTool",
+                Execution = new ToolExecution
+                {
+                    TaskSupport = ToolTaskSupport.Required
+                }
+            })
+    ]);
+```
+
+For more control over the task lifecycle, a tool can directly interact with [IMcpTaskStore][IMcpTaskStore] and return an `McpTask`.
+This bypasses automatic task wrapping and allows the tool to create a task, schedule background work, and return immediately:
+
+```csharp
+[McpServerToolType]
+public class MyTools(IMcpTaskStore taskStore)
+{
+    [McpServerTool]
+    [Description("Starts a background job and returns a task for polling.")]
+    public async Task<McpTask> StartBackgroundJob(
+        [Description("Number of items to process")] int itemCount,
+        RequestContext<CallToolRequestParams> context,
+        CancellationToken cancellationToken)
+    {
+        // Create a task in the store
+        var task = await taskStore.CreateTaskAsync(
+            new McpTaskMetadata { TimeToLive = TimeSpan.FromMinutes(30) },
+            context.JsonRpcRequest.Id!,
+            context.JsonRpcRequest,
+            context.Server.SessionId,
+            cancellationToken);
+
+        // Schedule work to run in the background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10));
+                var result = $"Processed {itemCount} items successfully";
+
+                await taskStore.StoreTaskResultAsync(
+                    task.TaskId,
+                    McpTaskStatus.Completed,
+                    JsonSerializer.SerializeToElement(new CallToolResult
+                    {
+                        Content = [new TextContentBlock { Text = result }]
+                    }),
+                    context.Server.SessionId);
+            }
+            catch (Exception ex)
+            {
+                await taskStore.StoreTaskResultAsync(
+                    task.TaskId,
+                    McpTaskStatus.Failed,
+                    JsonSerializer.SerializeToElement(new CallToolResult
+                    {
+                        Content = [new TextContentBlock { Text = ex.Message }],
+                        IsError = true
+                    }),
+                    context.Server.SessionId);
+            }
+        }, CancellationToken.None);
+
+        return task;
+    }
+}
+```
+
+### Client support
+
+To execute a tool as a task, a client includes the `Task` property in the request parameters:
+
+```csharp
+var result = await client.CallToolAsync(
+    new CallToolRequestParams
+    {
+        Name = "processDataset",
+        Arguments = new Dictionary<string, JsonElement>
+        {
+            ["recordCount"] = JsonSerializer.SerializeToElement(1000)
+        },
+        Task = new McpTaskMetadata
+        {
+            TimeToLive = TimeSpan.FromHours(2)
+        }
+    },
+    cancellationToken);
+
+if (result.Task != null)
+{
+    Console.WriteLine($"Task created: {result.Task.TaskId}");
+    Console.WriteLine($"Status: {result.Task.Status}");
+}
+```
+
+The client can then poll for status updates and retrieve the final result:
+
+```csharp
+// Poll until task reaches a terminal state
+var completedTask = await client.PollTaskUntilCompleteAsync(
+    taskId,
+    cancellationToken: cancellationToken);
+
+if (completedTask.Status == McpTaskStatus.Completed)
+{
+    var resultJson = await client.GetTaskResultAsync(
+        taskId,
+        cancellationToken: cancellationToken);
+
+    var result = resultJson.Deserialize<CallToolResult>(McpJsonUtilities.DefaultOptions);
+    foreach (var content in result?.Content ?? [])
+    {
+        if (content is TextContentBlock text)
+        {
+            Console.WriteLine(text.Text);
+        }
+    }
+}
+```
+
+The SDK also provides methods to list all tasks (`ListTasksAsync`) and cancel running tasks (`CancelTaskAsync`):
+
+```csharp
+// List all tasks for the current session
+var tasks = await client.ListTasksAsync(cancellationToken: cancellationToken);
+
+// Cancel a running task
+var cancelledTask = await client.CancelTaskAsync(taskId, cancellationToken: cancellationToken);
+```
+
+Clients can optionally register a handler to receive status notifications as they arrive,
+but should always use polling as the primary mechanism since notifications are optional:
+
+```csharp
+var options = new McpClientOptions
+{
+    Handlers = new McpClientHandlers
+    {
+        TaskStatusHandler = (task, cancellationToken) =>
+        {
+            Console.WriteLine($"Task {task.TaskId} status changed to {task.Status}");
+            return ValueTask.CompletedTask;
+        }
+    }
+};
+```
 
 [2025-11-25 version of the MCP Specification]: https://modelcontextprotocol.io/specification/2025-11-25
+[IMcpTaskStore]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.IMcpTaskStore.html
+[InMemoryMcpTaskStore]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.InMemoryMcpTaskStore.html
 [AddMcp]: https://modelcontextprotocol.github.io/csharp-sdk/api/Microsoft.Extensions.DependencyInjection.McpAuthenticationExtensions.html?q=AddMcp#Microsoft_Extensions_DependencyInjection_McpAuthenticationExtensions_AddMcp_Microsoft_AspNetCore_Authentication_AuthenticationBuilder_System_Action_ModelContextProtocol_AspNetCore_Authentication_McpAuthenticationOptions__
 [AIFunctionFactory.Create]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
 [AIFunctions]: https://modelcontextprotocol.github.io/csharp-sdk/api/ModelContextProtocol.AIContentExtensions.html
