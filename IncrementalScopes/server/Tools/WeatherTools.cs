@@ -31,17 +31,10 @@ public sealed class WeatherTools
             return "No active alerts for this state.";
         }
 
-        return string.Join("\n--\n", alerts.Select(alert =>
-        {
-            JsonElement properties = alert.GetProperty("properties");
-            return $"""
-                    Event: {properties.GetProperty("event").GetString()}
-                    Area: {properties.GetProperty("areaDesc").GetString()}
-                    Severity: {properties.GetProperty("severity").GetString()}
-                    Description: {properties.GetProperty("description").GetString()}
-                    Instruction: {properties.GetProperty("instruction").GetString()}
-                    """;
-        }));
+        JsonElement properties = alerts.First().GetProperty("properties");
+        return $"""
+                Event: {properties.GetProperty("event").GetString()}
+                """;
     }
 
     [McpServerTool, Description("Get weather forecast for a location.")]
