@@ -638,7 +638,7 @@ including translating between MCP tool invocation messages and the LLM's tool in
 
 These are the key aspects of the server-side logic for sampling requests with tools using the MCP C# SDK.
 
-## Support for OAuth Client ID Metadata Documents
+## OAuth Client ID Metadata Documents
 
 - SEP: [SEP-991](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/991)
 - Spec change: [PR #1296](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1296)
@@ -690,7 +690,7 @@ with the Authorization Server.
 If the Authorization Server does not support CIMD, the client will fall back to using Dynamic Client Registration (DCR)
 if DCR is enabled in the OAuth options.
 
-## Support for long-running requests over HTTP with polling
+## Long-running requests over HTTP with polling
 
 - SEP: [SEP-1699](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1699)
 - Spec change: [PR #1783](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1783)
